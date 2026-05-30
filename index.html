@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ecorise Banque - Banque en ligne</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-loader hidden" id="appLoader">
+    <div class="app-loader__spinner"></div>
+    <p id="appLoaderText">Chargement…</p>
+  </div>
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <div class="app">
+    <aside class="sidebar hidden" id="sidebar">
+      <button class="btn btn--close" id="btnCloseSidebar">Fermer</button>
+      <div class="sidebar__header">
+        <h3>Menu bancaire</h3>
+        <p>Choisissez un service</p>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="sidebar-link" href="#dashboard">Tableau de bord</a>
+        <a class="sidebar-link" href="#transfer">Transferts</a>
+        <a class="sidebar-link" href="#loan">Prêts</a>
+        <a class="sidebar-link" href="#cards">Cartes</a>
+        <a class="sidebar-link" href="#services">Services</a>
+        <a class="sidebar-link" href="#accounts">Comptes</a>
+        <a class="sidebar-link" href="#investments">Investissements</a>
+        <a class="sidebar-link" href="#support">Assistance</a>
+      </nav>
+    </aside>
+    <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
+
+    <header class="header">
+      <button class="btn btn--menu hidden" id="btnMenu">Menu</button>
+      <div class="brand">
+        <div class="brand__logo">Ecorise</div>
+        <span>Banque</span>
+      </div>
+      <button class="btn btn--logout hidden" id="btnLogout">Se déconnecter</button>
+    </header>
+
+    <main class="main">
+      <section class="card login-card" id="loginSection">
+        <h2>Connexion</h2>
+        <div class="login-tabs">
+          <button class="tab active" id="loginTab" type="button">Connexion</button>
+          <button class="tab" id="signupTab" type="button">Créer un compte</button>
+        </div>
+
+        <form class="form" id="loginForm">
+          <label for="inputUsername">Email</label>
+          <input id="inputUsername" type="email" placeholder="" required />
+
+          <label for="inputPin">Mot de passe</label>
+          <input id="inputPin" type="password" placeholder="" required />
+
+          <button class="btn btn--primary" type="submit">Se connecter</button>
+        </form>
+
+        <form class="form hidden" id="signupForm">
+          <label for="signupName">Nom complet</label>
+          <input id="signupName" type="text" placeholder="" required />
+
+          <label for="signupUsername">Email</label>
+          <input id="signupUsername" type="email" placeholder="" required />
+
+          <label for="signupPin">Mot de passe</label>
+          <input id="signupPin" type="password" placeholder="" required />
+
+          <button class="btn btn--secondary" type="submit">Créer un compte</button>
+        </form>
+
+        <p class="login-note">Entrez votre email et votre mot de passe pour vous connecter.</p>
+      </section>
+
+      <section class="card admin-panel hidden" id="adminPanel">
+        <div class="admin-panel__header">
+          <div>
+            <h2>Administration Ecorise Banque</h2>
+            <p>Gérez les comptes clients : le solde modifié met à jour automatiquement le relevé (entrées, sorties et solde final).</p>
+          </div>
+        </div>
+
+        <div class="admin-grid">
+          <div class="card admin-users-card">
+            <h3>Comptes clients</h3>
+            <ul class="admin-user-list" id="adminUserList"></ul>
+          </div>
+
+          <div class="card">
+            <h3>Modifier un compte</h3>
+            <form class="form" id="adminEditForm">
+              <label for="adminSelectUser">Client</label>
+              <select id="adminSelectUser" required>
+                <option value="">— Choisir un compte —</option>
+              </select>
+
+              <label for="adminEditName">Nom affiché</label>
+              <input id="adminEditName" type="text" placeholder="Nom complet" required />
+
+              <label for="adminEditBalance">Solde (€)</label>
+              <input id="adminEditBalance" type="number" step="0.01" placeholder="0" required />
+
+              <p class="admin-hint" id="adminCurrentBalance">Solde actuel : —</p>
+
+              <button class="btn btn--primary" type="submit">Enregistrer les modifications</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard hidden" id="dashboard">
+        <article class="balance-hero" id="balanceHeroCard">
+          <p>Solde disponible</p>
+          <h2 id="balanceHero">0 €</h2>
+        </article>
+
+        <div class="dashboard__welcome">
+          <div>
+            <h2 id="welcomeMessage">Bienvenue</h2>
+            <p id="currentDate"></p>
+          </div>
+          <div class="accounts-summary">
+            <article class="summary-card">
+              <p>Solde</p>
+              <h3 id="balance">0 €</h3>
+            </article>
+            <article class="summary-card">
+              <p>Entrées</p>
+              <h3 id="income">0 €</h3>
+            </article>
+            <article class="summary-card">
+              <p>Dépenses</p>
+              <h3 id="outcome">0 €</h3>
+            </article>
+            <article class="summary-card">
+              <p>Intérêts</p>
+              <h3 id="interest">0 €</h3>
+            </article>
+          </div>
+        </div>
+
+        <div class="menu-grid">
+          <a class="menu-card" href="#dashboard">Mes comptes</a>
+          <a class="menu-card" href="#transfer">Transferts</a>
+          <a class="menu-card" href="#loan">Prêts</a>
+          <a class="menu-card" href="#cards">Cartes</a>
+          <a class="menu-card" href="#services">Services</a>
+        </div>
+
+        <div class="card movements-card">
+          <div class="section-header">
+            <h3>Historique des opérations</h3>
+            <div class="section-actions">
+              <label class="search-field" for="movementSearch">
+                <span class="sr-only">Rechercher</span>
+                <input id="movementSearch" type="search" placeholder="Rechercher une opération…" />
+              </label>
+              <button class="btn btn--small btn--export" type="button" id="btnExportStatement">Exporter le relevé</button>
+              <button class="btn btn--small" id="btnSort">Trier</button>
+              <div class="filter-buttons">
+                <button class="btn btn--small btn--filter active" data-filter="all">Tous</button>
+                <button class="btn btn--small btn--filter" data-filter="deposit">Reçus</button>
+                <button class="btn btn--small btn--filter" data-filter="withdrawal">Dépenses</button>
+              </div>
+            </div>
+          </div>
+          <div class="movements" id="movements"></div>
+          <button type="button" class="btn btn--show-more hidden" id="btnShowMoreMovements">
+            Montrer plus
+          </button>
+          <div class="statement-footer hidden" id="statementFooter"></div>
+          <button type="button" class="btn btn--toggle-chart hidden" id="btnToggleChart">Afficher le graphique</button>
+          <div class="chart-section" id="chartSection">
+            <div class="spending-chart" id="spendingChart"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page hidden" id="pageTransfer">
+        <div class="page-header">
+          <h2>Transferts</h2>
+          <p>Envoyez un virement vers un destinataire avec tous les détails bancaires.</p>
+        </div>
+        <div class="card">
+          <form class="form" id="transferForm">
+            <label for="transferName">Nom du destinataire</label>
+            <input id="transferName" type="text" placeholder="Nom complet" required />
+
+            <label for="transferAccountNumber">Numéro de compte</label>
+            <input id="transferAccountNumber" type="text" placeholder="IBAN ou numéro de compte" required />
+
+            <label for="transferBic">BIC / SWIFT</label>
+            <input id="transferBic" type="text" placeholder="Code BIC" required />
+
+            <label for="transferReason">Raison de l’envoi</label>
+            <input id="transferReason" type="text" placeholder="Motif du virement" required />
+
+            <label for="transferAmount">Montant</label>
+            <input id="transferAmount" type="number" min="1" placeholder="0" required />
+
+            <button class="btn btn--secondary" type="submit">Envoyer</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="page hidden" id="pageLoan">
+        <div class="page-header">
+          <h2>Prêts</h2>
+          <p>Demandez un prêt personnel ou bancaire directement depuis votre espace.</p>
+        </div>
+        <div class="card">
+          <form class="form" id="loanForm">
+            <label for="loanAmount">Montant du prêt</label>
+            <input id="loanAmount" type="number" min="1" placeholder="Montant du prêt" required />
+            <button class="btn btn--secondary" type="submit">Demander</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="page hidden" id="pageCards">
+        <div class="page-header">
+          <h2>Cartes bancaires</h2>
+          <p>Consultez vos cartes et leurs détails.</p>
+        </div>
+        <div class="card card-list">
+          <div class="card-item">
+            <p>Carte débit</p>
+            <strong>1234 •••• •••• 5678</strong>
+            <span>Expire 08/28</span>
+          </div>
+          <div class="card-item">
+            <p>Carte crédit</p>
+            <strong>9876 •••• •••• 5432</strong>
+            <span>Expire 05/29</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="page hidden" id="pageServices">
+        <div class="page-header">
+          <h2>Mon profil</h2>
+          <p>Gérez vos informations, vos notifications et vos préférences.</p>
+        </div>
+
+        <div class="services-tabs">
+          <button class="btn btn--small service-tab active" type="button" data-panel="profile">Profil</button>
+          <button class="btn btn--small service-tab" type="button" data-panel="beneficiaries">Bénéficiaires</button>
+          <button class="btn btn--small service-tab" type="button" data-panel="support">Assistance</button>
+        </div>
+
+        <div class="service-panel active" id="serviceProfile">
+          <div class="card profile-unified-card">
+            <h3>Informations personnelles</h3>
+            <form class="form" id="profileForm">
+              <label for="serviceName">Nom affiché</label>
+              <input id="serviceName" type="text" placeholder="Nom complet" required />
+
+              <label for="servicePin">Nouveau mot de passe</label>
+              <input id="servicePin" type="password" placeholder="Laisser vide pour ne pas changer" minlength="4" />
+
+              <button class="btn btn--secondary" type="submit">Enregistrer le profil</button>
+            </form>
+
+            <hr class="profile-divider" />
+
+            <h3>Notifications</h3>
+            <form class="form" id="notificationsForm">
+              <label class="checkbox-label">
+                <input id="notifyEmail" type="checkbox" />
+                Recevoir les alertes par email
+              </label>
+              <label class="checkbox-label">
+                <input id="notifySms" type="checkbox" />
+                Recevoir les alertes par SMS
+              </label>
+              <button class="btn btn--secondary" type="submit">Mettre à jour les notifications</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="service-panel" id="serviceBeneficiaries">
+          <div class="card">
+            <h3>Gestion des bénéficiaires</h3>
+            <ul class="beneficiary-list" id="beneficiaryList"></ul>
+            <form class="form" id="addBeneficiaryForm">
+              <label for="beneficiaryName">Nom du bénéficiaire</label>
+              <input id="beneficiaryName" type="text" placeholder="Nom complet" required />
+
+              <label for="beneficiaryEmail">Email</label>
+              <input id="beneficiaryEmail" type="email" placeholder="Email" required />
+
+              <label for="beneficiaryAccount">Numéro de compte</label>
+              <input id="beneficiaryAccount" type="text" placeholder="Numéro de compte" required />
+
+              <label for="beneficiaryBic">BIC / SWIFT</label>
+              <input id="beneficiaryBic" type="text" placeholder="Code BIC" required />
+
+              <button class="btn btn--secondary" type="submit">Ajouter</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="service-panel" id="serviceSupport">
+          <div class="card">
+            <h3>Assistance</h3>
+            <p>Envoyez un message au support ou consultez les réponses rapides.</p>
+            <form class="form" id="supportForm">
+              <label for="supportSubject">Objet</label>
+              <input id="supportSubject" type="text" placeholder="Sujet" required />
+
+              <label for="supportMessage">Message</label>
+              <textarea id="supportMessage" rows="5" placeholder="Expliquez votre demande"></textarea>
+
+              <button class="btn btn--secondary" type="submit">Envoyer au support</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="page hidden" id="pageAccounts">
+        <div class="page-header">
+          <h2>Comptes et épargne</h2>
+          <p>Gérez vos comptes, vos produits d’épargne et vos demandes de nouveau contrat.</p>
+        </div>
+        <div class="page-tabs">
+          <button class="btn btn--small account-tab active" type="button" data-panel="summary">Mes comptes</button>
+          <button class="btn btn--small account-tab" type="button" data-panel="savings">Épargne</button>
+          <button class="btn btn--small account-tab" type="button" data-panel="actions">Actions</button>
+        </div>
+        <div class="page-panel account-panel active" id="accountSummary">
+          <div class="card">
+            <h3>Comptes disponibles</h3>
+            <ul class="account-list" id="accountProductList"></ul>
+          </div>
+        </div>
+        <div class="page-panel account-panel" id="accountSavings">
+          <div class="card">
+            <h3>Produits d’épargne</h3>
+            <ul class="account-list" id="savingsList"></ul>
+          </div>
+        </div>
+        <div class="page-panel account-panel" id="accountActions">
+          <div class="card">
+            <h3>Demander un produit</h3>
+            <form class="form" id="newProductForm">
+              <label for="newProductName">Nom du produit</label>
+              <input id="newProductName" type="text" placeholder="Ex: Livret A" required />
+
+              <label for="newProductType">Type</label>
+              <select id="newProductType">
+                <option value="Compte courant">Compte courant</option>
+                <option value="Livret épargne">Livret épargne</option>
+                <option value="Compte joint">Compte joint</option>
+              </select>
+              <button class="btn btn--secondary" type="submit">Demander</button>
+            </form>
+
+            <h3>Fermer un produit</h3>
+            <form class="form" id="closeProductForm">
+              <label for="closeProductName">Produit à fermer</label>
+              <input id="closeProductName" type="text" placeholder="Nom du produit" required />
+              <button class="btn btn--danger" type="submit">Fermer</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="page hidden" id="pageInvestment">
+        <div class="page-header">
+          <h2>Investissements</h2>
+          <p>Suivez votre portefeuille et passez de nouveaux ordres d’investissement.</p>
+        </div>
+        <div class="page-tabs">
+          <button class="btn btn--small investment-tab active" type="button" data-panel="portfolio">Portefeuille</button>
+          <button class="btn btn--small investment-tab" type="button" data-panel="invest">Investir</button>
+          <button class="btn btn--small investment-tab" type="button" data-panel="strategy">Stratégie</button>
+        </div>
+        <div class="page-panel investment-panel active" id="investmentPortfolio">
+          <div class="card">
+            <h3>Portefeuille</h3>
+            <ul class="investment-list" id="investmentList"></ul>
+          </div>
+        </div>
+        <div class="page-panel investment-panel" id="investmentInvest">
+          <div class="card">
+            <h3>Investir</h3>
+            <form class="form" id="investForm">
+              <label for="investProduct">Produit</label>
+              <select id="investProduct">
+                <option value="Actions">Actions</option>
+                <option value="Obligations">Obligations</option>
+                <option value="Fonds">Fonds</option>
+              </select>
+
+              <label for="investAmount">Montant</label>
+              <input id="investAmount" type="number" min="1" placeholder="Montant" required />
+
+              <button class="btn btn--secondary" type="submit">Investir</button>
+            </form>
+          </div>
+        </div>
+        <div class="page-panel" id="investmentStrategy">
+          <div class="card">
+            <h3>Conseils</h3>
+            <ul class="faq-list">
+              <li>Investissez régulièrement pour lisser les variations du marché.</li>
+              <li>Privilégiez la diversification entre actions, obligations et fonds.</li>
+              <li>Surveillez la performance, mais ne paniquez pas aux fluctuations courtes.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="page hidden" id="pageSupport">
+        <div class="page-header">
+          <h2>Assistance</h2>
+          <p>Créez une demande, suivez les tickets ou consultez la FAQ.</p>
+        </div>
+        <div class="page-tabs">
+          <button class="btn btn--small support-tab active" type="button" data-panel="faq">FAQ</button>
+          <button class="btn btn--small support-tab" type="button" data-panel="tickets">Tickets</button>
+        </div>
+        <div class="page-panel support-panel active" id="supportFaq">
+          <div class="card">
+            <h3>Questions fréquentes</h3>
+            <ul class="faq-list">
+              <li>Comment changer mon mot de passe ?</li>
+              <li>Comment ajouter un bénéficiaire ?</li>
+              <li>Comment demander un prêt ?</li>
+            </ul>
+          </div>
+        </div>
+        <div class="page-panel support-panel" id="supportTickets">
+          <div class="card">
+            <h3>Mes demandes</h3>
+            <ul class="ticket-list" id="ticketList"></ul>
+            <form class="form" id="ticketForm">
+              <label for="ticketSubject">Objet</label>
+              <input id="ticketSubject" type="text" placeholder="Sujet" required />
+
+              <label for="ticketMessage">Message</label>
+              <textarea id="ticketMessage" rows="5" placeholder="Expliquez votre demande" required></textarea>
+
+              <button class="btn btn--secondary" type="submit">Envoyer</button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+[
+  {
+    "owner": "Ingo Franc",
+    "username": "ingofranc@gmail.com",
+    "pin": "franc123",
+    "movements": [
+      200000,
+      300000,
+      350000,
+      250000,
+      -5000,
+      -12000,
+      4500,
+      -1400,
+      4800,
+      -950,
+      14250,
+      30600
+    ],
+    "movementDates": [],
+    "interestRate": 1.2,
+    "locale": "fr-FR",
+    "currency": "EUR",
+    "notifications": {
+      "email": true,
+      "sms": false
+    },
+    "beneficiaries": [],
+    "accountProducts": [
+      {
+        "name": "Compte courant",
+        "status": "Actif"
+      },
+      {
+        "name": "Livret \u00e9pargne",
+        "status": "Actif"
+      }
+    ],
+    "savings": [
+      {
+        "name": "Livret A",
+        "balance": 1200
+      },
+      {
+        "name": "Plan \u00e9pargne",
+        "balance": 5400
+      }
+    ],
+    "investments": [
+      {
+        "product": "Actions",
+        "amount": 200,
+        "date": "2026-05-10"
+      }
+    ],
+    "supportRequests": [
+      {
+        "subject": "Bloqu\u00e9 sur transfert",
+        "message": "Impossible de finaliser le virement.",
+        "status": "Ouvert",
+        "date": "2026-05-28"
+      }
+    ]
+  },
+  {
+    "owner": "Marie Dubois",
+    "username": "md",
+    "pin": "2222",
+    "movements": [
+      500,
+      340,
+      -300,
+      -20,
+      -460,
+      200,
+      190,
+      1000
+    ],
+    "movementDates": [],
+    "interestRate": 1.5,
+    "locale": "fr-FR",
+    "currency": "EUR",
+    "notifications": {
+      "email": true,
+      "sms": false
+    },
+    "beneficiaries": [],
+    "accountProducts": [
+      {
+        "name": "Compte courant",
+        "status": "Actif"
+      },
+      {
+        "name": "Compte joint",
+        "status": "Actif"
+      }
+    ],
+    "savings": [
+      {
+        "name": "Livret A",
+        "balance": 900
+      }
+    ],
+    "investments": [
+      {
+        "product": "Fonds",
+        "amount": 120,
+        "date": "2026-05-26"
+      }
+    ],
+    "supportRequests": []
+  }
+]
