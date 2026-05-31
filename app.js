@@ -104,6 +104,7 @@ function saveAccounts(data) {
 function replaceAccounts(nextAccounts) {
   accounts.length = 0;
   nextAccounts.forEach(account => {
+    ensureAccountSettings(account);
     regularizeMovementHistory(account);
     accounts.push(account);
   });
@@ -431,13 +432,42 @@ const createAccount = (owner, username, pin) => ({
   interestRate: 1.2,
   locale: 'fr-FR',
   currency: 'EUR',
-  notifications: { email: true, sms: false },
+  notifications: { email: true, sms: false, operations: false },
+  preferences: {
+    hideBalanceHero: false,
+    compactMovements: false,
+    maskBalances: false,
+  },
   beneficiaries: [],
   accountProducts: [{ name: 'Compte courant', status: 'Actif' }],
   savings: [{ name: 'Livret A', balance: 0 }],
   investments: [],
   supportRequests: [],
 });
+
+const ensureAccountSettings = account => {
+  if (!account.notifications) {
+    account.notifications = { email: true, sms: false, operations: false };
+  }
+  if (account.notifications.operations === undefined) {
+    account.notifications.operations = false;
+  }
+  if (!account.preferences) {
+    account.preferences = {
+      hideBalanceHero: false,
+      compactMovements: false,
+      maskBalances: false,
+    };
+  }
+  if (!account.locale) account.locale = 'fr-FR';
+  if (!account.currency) account.currency = 'EUR';
+};
+
+const formatWelcomeMessage = owner => `Bienvenue, ${owner.trim()}`;
+
+const setWelcomeMessage = owner => {
+  labelWelcome.textContent = formatWelcomeMessage(owner);
+};
 
 const filterStatementLines = (lines, { filterType = 'all', searchQuery = '' }) => {
   let filtered = lines.filter(line => filterType === 'all' || line.type === filterType);
@@ -645,6 +675,7 @@ const movementSearchInput = document.getElementById('movementSearch');
 const btnExportStatement = document.getElementById('btnExportStatement');
 
 const btnLogout = document.getElementById('btnLogout');
+const btnSettings = document.getElementById('btnSettings');
 const btnSort = document.getElementById('btnSort');
 const btnMenu = document.getElementById('btnMenu');
 const btnCloseSidebar = document.getElementById('btnCloseSidebar');
@@ -668,12 +699,29 @@ const loanAmount = document.getElementById('loanAmount');
 
 const serviceTabs = document.querySelectorAll('.service-tab');
 const servicePanels = document.querySelectorAll('.service-panel');
-const profileForm = document.getElementById('profileForm');
-const serviceName = document.getElementById('serviceName');
-const servicePin = document.getElementById('servicePin');
-const notificationsForm = document.getElementById('notificationsForm');
-const notifyEmail = document.getElementById('notifyEmail');
-const notifySms = document.getElementById('notifySms');
+
+const settingsTabs = document.querySelectorAll('.settings-tab');
+const settingsPanels = document.querySelectorAll('.settings-panel');
+const settingsProfileForm = document.getElementById('settingsProfileForm');
+const settingsName = document.getElementById('settingsName');
+const settingsEmail = document.getElementById('settingsEmail');
+const settingsNotificationsForm = document.getElementById('settingsNotificationsForm');
+const settingsNotifyEmail = document.getElementById('settingsNotifyEmail');
+const settingsNotifySms = document.getElementById('settingsNotifySms');
+const settingsNotifyOperations = document.getElementById('settingsNotifyOperations');
+const settingsPreferencesForm = document.getElementById('settingsPreferencesForm');
+const settingsLocale = document.getElementById('settingsLocale');
+const settingsCurrency = document.getElementById('settingsCurrency');
+const settingsHideBalanceHero = document.getElementById('settingsHideBalanceHero');
+const settingsCompactMovements = document.getElementById('settingsCompactMovements');
+const settingsSecurityForm = document.getElementById('settingsSecurityForm');
+const settingsCurrentPin = document.getElementById('settingsCurrentPin');
+const settingsNewPin = document.getElementById('settingsNewPin');
+const settingsConfirmPin = document.getElementById('settingsConfirmPin');
+const settingsPrivacyForm = document.getElementById('settingsPrivacyForm');
+const settingsMaskBalances = document.getElementById('settingsMaskBalances');
+const settingsAccountInfo = document.getElementById('settingsAccountInfo');
+const balanceHeroCard = document.getElementById('balanceHeroCard');
 const beneficiaryList = document.getElementById('beneficiaryList');
 const addBeneficiaryForm = document.getElementById('addBeneficiaryForm');
 const beneficiaryName = document.getElementById('beneficiaryName');
@@ -711,6 +759,7 @@ const adminUserList = document.getElementById('adminUserList');
 const adminEditForm = document.getElementById('adminEditForm');
 const adminSelectUser = document.getElementById('adminSelectUser');
 const adminEditName = document.getElementById('adminEditName');
+const adminEditPin = document.getElementById('adminEditPin');
 const adminEditBalance = document.getElementById('adminEditBalance');
 const adminCurrentBalance = document.getElementById('adminCurrentBalance');
 
@@ -857,7 +906,7 @@ function renderStatementFooter(account) {
 function calcDisplayBalance(account) {
   const balance = getAccountBalance(account);
   account.balance = balance;
-  const formatted = formatCurrency(balance, account.locale, account.currency);
+  const formatted = maskAmount(balance, account);
   labelBalance.textContent = formatted;
   if (labelBalanceHero) labelBalanceHero.textContent = formatted;
 }
@@ -871,19 +920,37 @@ function calcDisplaySummary(account) {
     .filter(int => int >= 1)
     .reduce((sum, int) => sum + int, 0);
 
-  labelIncome.textContent = formatCurrency(incomes, account.locale, account.currency);
-  labelOutcome.textContent = formatCurrency(Math.abs(outcomes), account.locale, account.currency);
-  labelInterest.textContent = formatCurrency(interest, account.locale, account.currency);
+  labelIncome.textContent = maskAmount(incomes, account);
+  labelOutcome.textContent = maskAmount(Math.abs(outcomes), account);
+  labelInterest.textContent = maskAmount(interest, account);
 }
 
 function updateUI(account) {
   if (!account) return;
+  ensureAccountSettings(account);
   ensureStatementCoherent(account);
+  setWelcomeMessage(account.owner);
   displayMovements(account, sorted, filter, movementSearch);
   calcDisplayBalance(account);
   calcDisplaySummary(account);
+  applyDisplayPreferences(account);
   account.statementBalance = roundAmount(getAccountBalance(account));
   updateChartVisibility();
+}
+
+function applyDisplayPreferences(account) {
+  if (balanceHeroCard) {
+    const hideHero = account.preferences?.hideBalanceHero && isMobileView();
+    balanceHeroCard.classList.toggle('hidden', hideHero);
+  }
+  if (containerMovements) {
+    containerMovements.classList.toggle('movements--compact', !!account.preferences?.compactMovements);
+  }
+}
+
+function maskAmount(value, account) {
+  if (account?.preferences?.maskBalances) return '••••••';
+  return formatCurrency(value, account.locale, account.currency);
 }
 
 function updateChartVisibility() {
@@ -937,6 +1004,7 @@ const viewsMap = {
   loan: ['#pageLoan'],
   cards: ['#pageCards'],
   services: ['#pageServices'],
+  settings: ['#pageSettings'],
   accounts: ['#pageAccounts'],
   investments: ['#pageInvestment'],
   support: ['#pageSupport'],
@@ -1002,6 +1070,7 @@ function showView(view) {
   selectors.forEach(sel => document.querySelectorAll(sel).forEach(el => el.classList.remove('hidden')));
 
   if (normalized === 'services' && currentAccount) displayServices();
+  if (normalized === 'settings' && currentAccount) displaySettings();
   if (normalized === 'accounts' && currentAccount) displayAccounts(currentAccount);
   if (normalized === 'investments' && currentAccount) displayInvestments(currentAccount);
   if (normalized === 'support' && currentAccount) displaySupportPage(currentAccount);
@@ -1019,12 +1088,14 @@ function fillAdminEditForm(username) {
   const account = accounts.find(acc => acc.username === username);
   if (!account) {
     adminEditName.value = '';
+    adminEditPin.value = '';
     adminEditBalance.value = '';
     adminCurrentBalance.textContent = 'Solde actuel : —';
     return;
   }
   const balance = getAccountBalance(account);
   adminEditName.value = account.owner;
+  adminEditPin.value = '';
   adminEditBalance.value = balance.toFixed(2);
   adminCurrentBalance.textContent = `Solde actuel : ${formatCurrency(balance, account.locale, account.currency)}`;
 }
@@ -1064,6 +1135,7 @@ function showAdminPanel() {
   containerAdmin.classList.remove('hidden');
   labelWelcome.textContent = 'Espace administrateur';
   btnMenu.classList.add('hidden');
+  if (btnSettings) btnSettings.classList.add('hidden');
   btnLogout.classList.remove('hidden');
   closeSidebar();
   renderAdminUserList();
@@ -1078,11 +1150,13 @@ function hideAdminPanel() {
 
 function showClientControls() {
   btnMenu.classList.remove('hidden');
+  if (btnSettings) btnSettings.classList.remove('hidden');
   btnLogout.classList.remove('hidden');
 }
 
 function hideClientControls() {
   btnMenu.classList.add('hidden');
+  if (btnSettings) btnSettings.classList.add('hidden');
   btnLogout.classList.add('hidden');
 }
 
@@ -1102,7 +1176,7 @@ function tryAutoLogin() {
     hideAdminPanel();
     showClientControls();
     containerLogin.classList.add('hidden');
-    labelWelcome.textContent = `Bienvenue, ${currentAccount.owner.split(' ')[0]}`;
+    setWelcomeMessage(currentAccount.owner);
     displayDate(currentAccount.locale);
     return true;
   }
@@ -1163,8 +1237,43 @@ function activateServicePanel(panelKey) {
 
 function displayServices() {
   if (!currentAccount) return;
-  activateServicePanel('profile');
-  updateServiceForms(currentAccount);
+  activateServicePanel('beneficiaries');
+  renderBeneficiaries(currentAccount);
+}
+
+function activateSettingsPanel(panelKey) {
+  activateTab(settingsTabs, settingsPanels, panelKey, 'settings');
+}
+
+function updateSettingsForms(account) {
+  ensureAccountSettings(account);
+  settingsName.value = account.owner;
+  settingsEmail.value = account.username;
+  settingsNotifyEmail.checked = account.notifications.email;
+  settingsNotifySms.checked = account.notifications.sms;
+  settingsNotifyOperations.checked = account.notifications.operations;
+  settingsLocale.value = account.locale;
+  settingsCurrency.value = account.currency;
+  settingsHideBalanceHero.checked = account.preferences.hideBalanceHero;
+  settingsCompactMovements.checked = account.preferences.compactMovements;
+  settingsMaskBalances.checked = account.preferences.maskBalances;
+  settingsCurrentPin.value = '';
+  settingsNewPin.value = '';
+  settingsConfirmPin.value = '';
+
+  const balance = getAccountBalance(account);
+  settingsAccountInfo.innerHTML = `
+    <li><strong>Nom</strong><span>${account.owner}</span></li>
+    <li><strong>Email</strong><span>${account.username}</span></li>
+    <li><strong>Solde</strong><span>${formatCurrency(balance, account.locale, account.currency)}</span></li>
+    <li><strong>Produits actifs</strong><span>${account.accountProducts.length}</span></li>
+    <li><strong>Bénéficiaires</strong><span>${account.beneficiaries.length}</span></li>`;
+}
+
+function displaySettings() {
+  if (!currentAccount) return;
+  activateSettingsPanel('profile');
+  updateSettingsForms(currentAccount);
 }
 
 function renderBeneficiaries(account) {
@@ -1189,10 +1298,6 @@ function renderBeneficiaries(account) {
 }
 
 function updateServiceForms(account) {
-  serviceName.value = account.owner;
-  servicePin.value = '';
-  notifyEmail.checked = account.notifications?.email ?? true;
-  notifySms.checked = account.notifications?.sms ?? false;
   renderBeneficiaries(account);
 }
 
@@ -1295,7 +1400,7 @@ loginForm.addEventListener('submit', async e => {
       hideAdminPanel();
       showClientControls();
       containerLogin.classList.add('hidden');
-      labelWelcome.textContent = `Bienvenue, ${currentAccount.owner.split(' ')[0]}`;
+      labelWelcome.textContent = `Bienvenue, ${currentAccount.owner}`;
       displayDate(currentAccount.locale);
       saveSession(username, pin, 'user');
       inputUsername.value = inputPin.value = '';
@@ -1322,10 +1427,15 @@ adminEditForm.addEventListener('submit', async e => {
     }
 
     const newName = adminEditName.value.trim();
+    const newPin = adminEditPin.value.trim();
     const newBalance = Number(adminEditBalance.value);
 
     if (!newName) {
       showError('Le nom affiché est requis.');
+      return;
+    }
+    if (newPin && newPin.length < 4) {
+      showError('Le mot de passe doit contenir au moins 4 caractères.');
       return;
     }
     if (!Number.isFinite(newBalance)) {
@@ -1335,6 +1445,8 @@ adminEditForm.addEventListener('submit', async e => {
 
     const previousBalance = getAccountBalance(account);
     account.owner = newName;
+    if (newPin) account.pin = newPin;
+    adminEditPin.value = '';
     const { changed } = syncStatementToBalance(account, newBalance);
     account.statementBalance = roundAmount(getAccountBalance(account));
     await persistAccounts();
@@ -1343,11 +1455,15 @@ adminEditForm.addEventListener('submit', async e => {
     adminSelectUser.value = username;
     fillAdminEditForm(username);
 
-    if (currentAccount?.username === username) updateUI(currentAccount);
+    if (currentAccount?.username === username) {
+      setWelcomeMessage(currentAccount.owner);
+      updateUI(currentAccount);
+    }
 
     const finalBalance = getAccountBalance(account);
+    const pinMsg = newPin ? ' — mot de passe mis à jour' : '';
     showSuccess(
-      `Compte mis à jour : ${newName} — solde ${formatCurrency(finalBalance, account.locale, account.currency)}` +
+      `Compte mis à jour : ${newName} — solde ${formatCurrency(finalBalance, account.locale, account.currency)}${pinMsg}` +
         (changed && newBalance > previousBalance
           ? ' (régularisation entrée ajoutée)'
           : changed && newBalance < previousBalance
@@ -1387,6 +1503,9 @@ signupForm.addEventListener('submit', e => {
 
 btnLogout.addEventListener('click', logout);
 btnMenu.addEventListener('click', openSidebar);
+if (btnSettings) {
+  btnSettings.addEventListener('click', () => showView('settings'));
+}
 btnCloseSidebar.addEventListener('click', closeSidebar);
 sidebarOverlay.addEventListener('click', closeSidebar);
 
@@ -1399,6 +1518,10 @@ adminSelectUser.addEventListener('change', function () {
 
 serviceTabs.forEach(tab => {
   tab.addEventListener('click', () => activateServicePanel(tab.dataset.panel));
+});
+
+settingsTabs.forEach(tab => {
+  tab.addEventListener('click', () => activateSettingsPanel(tab.dataset.panel));
 });
 
 accountTabs.forEach(tab => {
@@ -1477,29 +1600,85 @@ ticketForm.addEventListener('submit', e => {
   showSuccess('Ticket de support envoyé.');
 });
 
-profileForm.addEventListener('submit', e => {
+settingsProfileForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!currentAccount) return;
-  const name = serviceName.value.trim();
-  const pin = servicePin.value.trim();
+  const name = settingsName.value.trim();
   if (!name) {
-    showError('Le nom est requis.');
+    showError('Le nom complet est requis.');
     return;
   }
   currentAccount.owner = name;
-  if (pin.length >= 4) currentAccount.pin = pin;
-  servicePin.value = '';
-  persistAccounts();
-  showSuccess('Profil mis à jour.');
+  await persistAccounts();
+  setWelcomeMessage(currentAccount.owner);
+  updateSettingsForms(currentAccount);
   updateUI(currentAccount);
+  showSuccess('Profil mis à jour.');
 });
 
-notificationsForm.addEventListener('submit', e => {
+settingsNotificationsForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!currentAccount) return;
-  currentAccount.notifications = { email: notifyEmail.checked, sms: notifySms.checked };
-  persistAccounts();
-  showSuccess('Préférences de notification mises à jour.');
+  currentAccount.notifications = {
+    email: settingsNotifyEmail.checked,
+    sms: settingsNotifySms.checked,
+    operations: settingsNotifyOperations.checked,
+  };
+  await persistAccounts();
+  showSuccess('Notifications mises à jour.');
+});
+
+settingsPreferencesForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!currentAccount) return;
+  currentAccount.locale = settingsLocale.value;
+  currentAccount.currency = settingsCurrency.value;
+  currentAccount.preferences.hideBalanceHero = settingsHideBalanceHero.checked;
+  currentAccount.preferences.compactMovements = settingsCompactMovements.checked;
+  await persistAccounts();
+  displayDate(currentAccount.locale);
+  updateUI(currentAccount);
+  showSuccess('Préférences enregistrées.');
+});
+
+settingsSecurityForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!currentAccount) return;
+  const currentPin = settingsCurrentPin.value;
+  const newPin = settingsNewPin.value.trim();
+  const confirmPin = settingsConfirmPin.value.trim();
+
+  if (!currentPin) {
+    showError('Indiquez votre mot de passe actuel.');
+    return;
+  }
+  if (String(currentAccount.pin) !== String(currentPin)) {
+    showError('Mot de passe actuel incorrect.');
+    return;
+  }
+  if (newPin.length < 4) {
+    showError('Le nouveau mot de passe doit contenir au moins 4 caractères.');
+    return;
+  }
+  if (newPin !== confirmPin) {
+    showError('Les mots de passe ne correspondent pas.');
+    return;
+  }
+
+  currentAccount.pin = newPin;
+  await persistAccounts();
+  saveSession(currentAccount.username, newPin, 'user');
+  settingsCurrentPin.value = settingsNewPin.value = settingsConfirmPin.value = '';
+  showSuccess('Mot de passe modifié avec succès.');
+});
+
+settingsPrivacyForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!currentAccount) return;
+  currentAccount.preferences.maskBalances = settingsMaskBalances.checked;
+  await persistAccounts();
+  updateUI(currentAccount);
+  showSuccess('Paramètres de confidentialité enregistrés.');
 });
 
 addBeneficiaryForm.addEventListener('submit', e => {
@@ -1611,6 +1790,7 @@ document.querySelectorAll('.menu-card, .sidebar-link').forEach(link => {
       loan: 'loan',
       cards: 'cards',
       services: 'services',
+      settings: 'settings',
       accounts: 'accounts',
       investments: 'investments',
       investment: 'investments',

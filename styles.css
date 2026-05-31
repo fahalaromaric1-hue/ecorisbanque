@@ -50,15 +50,19 @@ button {
 
 .header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 32px;
   padding: 12px 20px;
   min-height: 64px;
   background: var(--card);
   border-radius: 20px;
   box-shadow: var(--shadow);
+}
+
+.header .btn--settings {
+  justify-self: end;
 }
 
 .header .btn--menu {
@@ -239,6 +243,29 @@ input:focus {
   height: 44px;
   padding: 0 16px;
   background: #1c7ed6;
+}
+
+.btn--settings {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: #eef2ff;
+  color: #1c7ed6;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.btn--settings:hover {
+  background: #dbe4ff;
+}
+
+.icon-settings {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .btn--close {
@@ -666,9 +693,34 @@ input:focus {
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.menu-card--settings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.menu-card__icon {
+  width: 22px;
+  height: 22px;
+  color: var(--primary);
+}
+
+.sidebar-link--settings {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-link--settings .icon-settings {
+  width: 18px;
+  height: 18px;
 }
 
 .menu-card {
@@ -722,6 +774,32 @@ input:focus {
   padding: 14px 16px;
   border-radius: 14px;
   background: #f4f7fb;
+}
+
+.settings-info-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-info-list strong {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.settings-info-list span {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.movements--compact .movement {
+  padding: 10px 14px;
+}
+
+.movements--compact .movement__meta {
+  font-size: 0.82rem;
 }
 
 .accounts-summary {
@@ -917,7 +995,7 @@ input:focus {
   }
 
   .header {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr auto auto;
     padding: 8px 10px;
     gap: 8px;
     border-radius: 16px;
