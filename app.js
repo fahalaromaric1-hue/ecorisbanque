@@ -161,9 +161,9 @@ const formatMovementDate = (date, locale) => {
 
   const daysPassed = calcDaysPassed(new Date(), date);
   let dayLabel;
-  if (daysPassed === 0) dayLabel = 'Aujourd’hui';
-  else if (daysPassed === 1) dayLabel = 'Hier';
-  else if (daysPassed <= 7) dayLabel = `Il y a ${daysPassed} jours`;
+  if (daysPassed === 0) dayLabel = t('today', locale);
+  else if (daysPassed === 1) dayLabel = t('yesterday', locale);
+  else if (daysPassed <= 7) dayLabel = t('daysAgo', locale, { n: daysPassed });
   else {
     dayLabel = new Intl.DateTimeFormat(locale, {
       day: '2-digit',
@@ -423,15 +423,17 @@ const ensureStatementCoherent = account => {
   }
 };
 
-const createAccount = (owner, username, pin) => ({
+const createAccount = (owner, username, pin) => {
+  const locale = detectBrowserLocale();
+  return {
   owner,
   username,
   pin,
   movements: [0],
   movementDates: [],
   interestRate: 1.2,
-  locale: 'fr-FR',
-  currency: 'EUR',
+  locale,
+  currency: getLocaleCurrency(locale),
   notifications: { email: true, sms: false, operations: false },
   preferences: {
     hideBalanceHero: false,
@@ -443,7 +445,8 @@ const createAccount = (owner, username, pin) => ({
   savings: [{ name: 'Livret A', balance: 0 }],
   investments: [],
   supportRequests: [],
-});
+};
+};
 
 const ensureAccountSettings = account => {
   if (!account.notifications) {
@@ -459,15 +462,130 @@ const ensureAccountSettings = account => {
       maskBalances: false,
     };
   }
-  if (!account.locale) account.locale = 'fr-FR';
-  if (!account.currency) account.currency = 'EUR';
+  if (!account.locale || !LOCALE_CONFIG[account.locale]) {
+    account.locale = detectBrowserLocale();
+  }
+  if (!account.currency) {
+    account.currency = getLocaleCurrency(account.locale);
+  }
 };
 
-const formatWelcomeMessage = owner => `Bienvenue, ${owner.trim()}`;
+const formatWelcomeMessage = (owner, locale = 'fr-FR') => `${t('welcome', locale)}, ${owner.trim()}`;
 
-const setWelcomeMessage = owner => {
-  labelWelcome.textContent = formatWelcomeMessage(owner);
+const setWelcomeMessage = (owner, locale) => {
+  const activeLocale = locale || currentAccount?.locale || guestLocale;
+  labelWelcome.textContent = formatWelcomeMessage(owner, activeLocale);
 };
+
+let guestLocale = detectBrowserLocale();
+
+function getActiveLocale() {
+  return currentAccount?.locale || guestLocale;
+}
+
+function populateLocaleOptions() {
+  if (!settingsLocale) return;
+  settingsLocale.innerHTML = Object.entries(LOCALE_CONFIG)
+    .map(
+      ([code, cfg]) =>
+        `<option value="${code}">${cfg.label} — ${cfg.country}</option>`
+    )
+    .join('');
+}
+
+function populateCurrencyOptions() {
+  if (!settingsCurrency) return;
+  settingsCurrency.innerHTML = CURRENCY_OPTIONS.map(
+    c => `<option value="${c.code}">${c.label}</option>`
+  ).join('');
+}
+
+function updateCountryHint(locale) {
+  const hint = document.getElementById('settingsCountryHint');
+  if (!hint) return;
+  const cfg = LOCALE_CONFIG[locale];
+  if (!cfg) {
+    hint.textContent = '';
+    return;
+  }
+  hint.textContent = `${t('countryLabel', locale)} : ${cfg.country} · ${t('currencyLabel', locale)} : ${getLocaleCurrency(locale)}`;
+}
+
+function applyStaticTranslations(locale) {
+  document.documentElement.lang = locale;
+  document.documentElement.dir = getLocaleDir(locale);
+  document.title = t('appTitle', locale);
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n, locale);
+  });
+
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder, locale);
+  });
+
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAria, locale));
+  });
+
+  const loaderText = document.getElementById('appLoaderText');
+  if (loaderText) loaderText.textContent = t('loading', locale);
+
+  filterButtons.forEach(btn => {
+    const key = btn.dataset.i18n;
+    if (key) btn.textContent = t(key, locale);
+  });
+
+  if (btnToggleChart && chartExpanded !== undefined) {
+    btnToggleChart.textContent = chartExpanded
+      ? t('hideChart', locale)
+      : t('showChart', locale);
+  }
+
+  if (btnShowMoreMovements && !btnShowMoreMovements.classList.contains('hidden') && currentAccount) {
+    updateMovementsToggle(
+      buildStatementLines(currentAccount).length,
+      containerMovements.querySelectorAll('.movement').length,
+      sorted
+    );
+  }
+}
+
+function applyAppLocale(locale = getActiveLocale()) {
+  guestLocale = locale;
+  applyStaticTranslations(locale);
+  updateCountryHint(locale);
+
+  if (currentAccount) {
+    displayDate(locale);
+    if (!containerDashboard.classList.contains('hidden')) {
+      updateUI(currentAccount);
+    }
+    if (!document.getElementById('pageSettings')?.classList.contains('hidden')) {
+      updateSettingsForms(currentAccount);
+    }
+  } else if (labelWelcome && containerLogin && !containerLogin.classList.contains('hidden')) {
+    labelWelcome.textContent = t('welcome', locale);
+  }
+}
+
+async function applyLocalePreferenceChange({ persist = true, notify = true } = {}) {
+  if (!currentAccount) return;
+
+  const locale = settingsLocale.value;
+  if (!LOCALE_CONFIG[locale]) return;
+
+  currentAccount.locale = locale;
+  currentAccount.currency = settingsCurrency.value || getLocaleCurrency(locale);
+  settingsCurrency.value = currentAccount.currency;
+  updateCountryHint(locale);
+  applyAppLocale(locale);
+
+  if (persist) {
+    await persistAccounts();
+    if (notify) showSuccess(t('localeUpdated', locale));
+  }
+}
 
 const filterStatementLines = (lines, { filterType = 'all', searchQuery = '' }) => {
   let filtered = lines.filter(line => filterType === 'all' || line.type === filterType);
@@ -478,7 +596,7 @@ const filterStatementLines = (lines, { filterType = 'all', searchQuery = '' }) =
   return filtered.filter(line => {
     const label = line.label || line.type;
     const amountStr = String(Math.abs(line.amount));
-    const dateStr = line.date.toLocaleDateString('fr-FR');
+    const dateStr = line.date.toLocaleDateString(getActiveLocale());
     return (
       label.toLowerCase().includes(q) ||
       amountStr.includes(q) ||
@@ -811,7 +929,7 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
   }
 
   if (lines.length === 0) {
-    containerMovements.innerHTML = '<p class="empty-state">Aucune opération disponible.</p>';
+    containerMovements.innerHTML = `<p class="empty-state">${t('noMovements', account.locale)}</p>`;
     updateMovementsToggle(0, 0, sort);
     if (statementFooter) statementFooter.classList.add('hidden');
     if (spendingChart) spendingChart.innerHTML = '';
@@ -820,14 +938,13 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
 
   lines.forEach((line, i) => {
     const operationLabel =
-      MOVEMENT_LABEL_TRANSLATIONS[line.label] ||
-      MOVEMENT_LABEL_TRANSLATIONS[line.type] ||
-      line.label ||
-      line.type;
+      line.label === RELEVE_LABEL_IN || line.label === RELEVE_LABEL_OUT
+        ? line.label
+        : t(line.type === 'deposit' ? 'deposit' : 'withdrawal', account.locale);
     const balanceAfter = balanceByIndex.get(line.index);
     const balanceHtml =
       !sort && balanceAfter !== undefined
-        ? `<p class="movement-balance">Solde : ${formatCurrency(balanceAfter, account.locale, account.currency)}</p>`
+        ? `<p class="movement-balance">${t('movementBalance', account.locale)} : ${formatCurrency(balanceAfter, account.locale, account.currency)}</p>`
         : '';
 
     containerMovements.insertAdjacentHTML(
@@ -854,6 +971,7 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
 function updateMovementsToggle(total, shown, sort) {
   if (!btnShowMoreMovements) return;
 
+  const locale = currentAccount?.locale || guestLocale;
   const onMobile = isMobileView();
   const hasMore = total > MOBILE_PREVIEW_MOVEMENTS;
 
@@ -863,11 +981,12 @@ function updateMovementsToggle(total, shown, sort) {
   }
 
   btnShowMoreMovements.classList.remove('hidden');
+  const remaining = total - shown;
   btnShowMoreMovements.textContent = movementsExpanded
-    ? 'Montrer moins'
-    : total - shown > 1
-      ? `Montrer plus (${total - shown} opérations)`
-      : 'Montrer plus (1 opération)';
+    ? t('showLess', locale)
+    : remaining > 1
+      ? t('showMoreOps', locale, { n: remaining })
+      : t('showMoreOne', locale);
 }
 
 function renderStatementFooter(account) {
@@ -929,7 +1048,7 @@ function updateUI(account) {
   if (!account) return;
   ensureAccountSettings(account);
   ensureStatementCoherent(account);
-  setWelcomeMessage(account.owner);
+  setWelcomeMessage(account.owner, account.locale);
   displayMovements(account, sorted, filter, movementSearch);
   calcDisplayBalance(account);
   calcDisplaySummary(account);
@@ -955,10 +1074,13 @@ function maskAmount(value, account) {
 
 function updateChartVisibility() {
   if (!chartSection || !btnToggleChart) return;
+  const locale = currentAccount?.locale || guestLocale;
   const mobile = isMobileView();
   chartSection.classList.toggle('chart-section--collapsed', mobile && !chartExpanded);
   btnToggleChart.classList.toggle('hidden', !mobile);
-  btnToggleChart.textContent = chartExpanded ? 'Masquer le graphique' : 'Afficher le graphique';
+  btnToggleChart.textContent = chartExpanded
+    ? t('hideChart', locale)
+    : t('showChart', locale);
 }
 
 function renderSpendingChart(account) {
@@ -1133,7 +1255,7 @@ function showAdminPanel() {
   containerLogin.classList.add('hidden');
   containerDashboard.classList.add('hidden');
   containerAdmin.classList.remove('hidden');
-  labelWelcome.textContent = 'Espace administrateur';
+  labelWelcome.textContent = t('adminWelcome', getActiveLocale());
   btnMenu.classList.add('hidden');
   if (btnSettings) btnSettings.classList.add('hidden');
   btnLogout.classList.remove('hidden');
@@ -1176,8 +1298,9 @@ function tryAutoLogin() {
     hideAdminPanel();
     showClientControls();
     containerLogin.classList.add('hidden');
-    setWelcomeMessage(currentAccount.owner);
+    setWelcomeMessage(currentAccount.owner, currentAccount.locale);
     displayDate(currentAccount.locale);
+    applyAppLocale(currentAccount.locale);
     return true;
   }
   return false;
@@ -1189,7 +1312,7 @@ function logout() {
   hideAdminPanel();
   hideClientControls();
   containerLogin.classList.remove('hidden');
-  labelWelcome.textContent = 'Connectez-vous pour accéder à votre compte';
+  labelWelcome.textContent = t('guestWelcome', guestLocale);
   closeSidebar();
   clearSession();
   currentAccount = null;
@@ -1257,6 +1380,7 @@ function updateSettingsForms(account) {
   settingsHideBalanceHero.checked = account.preferences.hideBalanceHero;
   settingsCompactMovements.checked = account.preferences.compactMovements;
   settingsMaskBalances.checked = account.preferences.maskBalances;
+  updateCountryHint(account.locale);
   settingsCurrentPin.value = '';
   settingsNewPin.value = '';
   settingsConfirmPin.value = '';
@@ -1400,8 +1524,9 @@ loginForm.addEventListener('submit', async e => {
       hideAdminPanel();
       showClientControls();
       containerLogin.classList.add('hidden');
-      labelWelcome.textContent = `Bienvenue, ${currentAccount.owner}`;
+      setWelcomeMessage(currentAccount.owner, currentAccount.locale);
       displayDate(currentAccount.locale);
+      applyAppLocale(currentAccount.locale);
       saveSession(username, pin, 'user');
       inputUsername.value = inputPin.value = '';
       showSuccess('Connexion réussie.');
@@ -1631,15 +1756,29 @@ settingsNotificationsForm.addEventListener('submit', async e => {
 settingsPreferencesForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!currentAccount) return;
-  currentAccount.locale = settingsLocale.value;
-  currentAccount.currency = settingsCurrency.value;
   currentAccount.preferences.hideBalanceHero = settingsHideBalanceHero.checked;
   currentAccount.preferences.compactMovements = settingsCompactMovements.checked;
-  await persistAccounts();
-  displayDate(currentAccount.locale);
+  await applyLocalePreferenceChange({ persist: true, notify: false });
   updateUI(currentAccount);
-  showSuccess('Préférences enregistrées.');
+  showSuccess(t('localeUpdated', currentAccount.locale));
 });
+
+if (settingsLocale) {
+  settingsLocale.addEventListener('change', () => {
+    if (!currentAccount) return;
+    settingsCurrency.value = getLocaleCurrency(settingsLocale.value);
+    applyLocalePreferenceChange({ persist: true, notify: true });
+  });
+}
+
+if (settingsCurrency) {
+  settingsCurrency.addEventListener('change', async () => {
+    if (!currentAccount) return;
+    currentAccount.currency = settingsCurrency.value;
+    applyAppLocale(currentAccount.locale);
+    await persistAccounts();
+  });
+}
 
 settingsSecurityForm.addEventListener('submit', async e => {
   e.preventDefault();
@@ -1803,10 +1942,18 @@ document.querySelectorAll('.menu-card, .sidebar-link').forEach(link => {
 
 // --- Init ---
 async function initApp() {
+  populateLocaleOptions();
+  populateCurrencyOptions();
   await syncAccountsFromServer();
 
   tryAutoLogin();
   rebindCurrentAccount();
+
+  if (currentAccount) {
+    applyAppLocale(currentAccount.locale);
+  } else {
+    applyAppLocale(guestLocale);
+  }
 
   const initialHash = normalizeView((location.hash || '').replace('#', '').trim() || 'dashboard');
   if (isAdminSession) {

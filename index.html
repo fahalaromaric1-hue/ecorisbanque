@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,72 +15,72 @@
 
   <div class="app">
     <aside class="sidebar hidden" id="sidebar">
-      <button class="btn btn--close" id="btnCloseSidebar">Fermer</button>
+      <button class="btn btn--close" id="btnCloseSidebar" data-i18n="close">Fermer</button>
       <div class="sidebar__header">
-        <h3>Menu bancaire</h3>
-        <p>Choisissez un service</p>
+        <h3 data-i18n="sidebarTitle">Menu bancaire</h3>
+        <p data-i18n="sidebarSubtitle">Choisissez un service</p>
       </div>
       <nav class="sidebar-nav">
-        <a class="sidebar-link" href="#dashboard">Tableau de bord</a>
-        <a class="sidebar-link" href="#transfer">Transferts</a>
-        <a class="sidebar-link" href="#loan">Prêts</a>
-        <a class="sidebar-link" href="#cards">Cartes</a>
-        <a class="sidebar-link" href="#services">Services</a>
+        <a class="sidebar-link" href="#dashboard" data-i18n="navDashboard">Tableau de bord</a>
+        <a class="sidebar-link" href="#transfer" data-i18n="navTransfer">Transferts</a>
+        <a class="sidebar-link" href="#loan" data-i18n="navLoan">Prêts</a>
+        <a class="sidebar-link" href="#cards" data-i18n="navCards">Cartes</a>
+        <a class="sidebar-link" href="#services" data-i18n="navServices">Services</a>
         <a class="sidebar-link sidebar-link--settings" href="#settings">
           <svg class="icon-settings" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
-          Paramètres
+          <span data-i18n="navSettings">Paramètres</span>
         </a>
-        <a class="sidebar-link" href="#accounts">Comptes</a>
-        <a class="sidebar-link" href="#investments">Investissements</a>
-        <a class="sidebar-link" href="#support">Assistance</a>
+        <a class="sidebar-link" href="#accounts" data-i18n="navAccounts">Comptes</a>
+        <a class="sidebar-link" href="#investments" data-i18n="navInvestments">Investissements</a>
+        <a class="sidebar-link" href="#support" data-i18n="navSupport">Assistance</a>
       </nav>
     </aside>
     <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
 
     <header class="header">
-      <button class="btn btn--menu hidden" id="btnMenu">Menu</button>
+      <button class="btn btn--menu hidden" id="btnMenu" data-i18n="menu">Menu</button>
       <div class="brand">
         <div class="brand__logo">Ecorise</div>
         <span>Banque</span>
       </div>
-      <button class="btn btn--settings hidden" id="btnSettings" type="button" aria-label="Paramètres">
+      <button class="btn btn--settings hidden" id="btnSettings" type="button" data-i18n-aria="settings">
         <svg class="icon-settings" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
       </button>
-      <button class="btn btn--logout hidden" id="btnLogout">Se déconnecter</button>
+      <button class="btn btn--logout hidden" id="btnLogout" data-i18n="logout">Se déconnecter</button>
     </header>
 
     <main class="main">
       <section class="card login-card" id="loginSection">
-        <h2>Connexion</h2>
+        <h2 data-i18n="login">Connexion</h2>
         <div class="login-tabs">
-          <button class="tab active" id="loginTab" type="button">Connexion</button>
-          <button class="tab" id="signupTab" type="button">Créer un compte</button>
+          <button class="tab active" id="loginTab" type="button" data-i18n="login">Connexion</button>
+          <button class="tab" id="signupTab" type="button" data-i18n="signup">Créer un compte</button>
         </div>
 
         <form class="form" id="loginForm">
-          <label for="inputUsername">Email</label>
+          <label for="inputUsername" data-i18n="email">Email</label>
           <input id="inputUsername" type="email" placeholder="" required />
 
-          <label for="inputPin">Mot de passe</label>
+          <label for="inputPin" data-i18n="password">Mot de passe</label>
           <input id="inputPin" type="password" placeholder="" required />
 
-          <button class="btn btn--primary" type="submit">Se connecter</button>
+          <button class="btn btn--primary" type="submit" data-i18n="connect">Se connecter</button>
         </form>
 
         <form class="form hidden" id="signupForm">
-          <label for="signupName">Nom complet</label>
+          <label for="signupName" data-i18n="fullName">Nom complet</label>
           <input id="signupName" type="text" placeholder="" required />
 
-          <label for="signupUsername">Email</label>
+          <label for="signupUsername" data-i18n="email">Email</label>
           <input id="signupUsername" type="email" placeholder="" required />
 
-          <label for="signupPin">Mot de passe</label>
+          <label for="signupPin" data-i18n="password">Mot de passe</label>
           <input id="signupPin" type="password" placeholder="" required />
 
-          <button class="btn btn--secondary" type="submit">Créer un compte</button>
+          <button class="btn btn--secondary" type="submit" data-i18n="signup">Créer un compte</button>
         </form>
 
-        <p class="login-note">Entrez votre email et votre mot de passe pour vous connecter.</p>
+        <p class="login-note" data-i18n="loginNote">Entrez votre email et votre mot de passe pour vous connecter.</p>
       </section>
 
       <section class="card admin-panel hidden" id="adminPanel">
@@ -124,7 +124,7 @@
 
       <section class="dashboard hidden" id="dashboard">
         <article class="balance-hero" id="balanceHeroCard">
-          <p>Solde disponible</p>
+          <p data-i18n="availableBalance">Solde disponible</p>
           <h2 id="balanceHero">0 €</h2>
         </article>
 
@@ -135,50 +135,50 @@
           </div>
           <div class="accounts-summary">
             <article class="summary-card">
-              <p>Solde</p>
+              <p data-i18n="balance">Solde</p>
               <h3 id="balance">0 €</h3>
             </article>
             <article class="summary-card">
-              <p>Entrées</p>
+              <p data-i18n="income">Entrées</p>
               <h3 id="income">0 €</h3>
             </article>
             <article class="summary-card">
-              <p>Dépenses</p>
+              <p data-i18n="expenses">Dépenses</p>
               <h3 id="outcome">0 €</h3>
             </article>
             <article class="summary-card">
-              <p>Intérêts</p>
+              <p data-i18n="interest">Intérêts</p>
               <h3 id="interest">0 €</h3>
             </article>
           </div>
         </div>
 
         <div class="menu-grid">
-          <a class="menu-card" href="#dashboard">Mes comptes</a>
-          <a class="menu-card" href="#transfer">Transferts</a>
-          <a class="menu-card" href="#loan">Prêts</a>
-          <a class="menu-card" href="#cards">Cartes</a>
-          <a class="menu-card" href="#services">Services</a>
+          <a class="menu-card" href="#dashboard" data-i18n="navMyAccounts">Mes comptes</a>
+          <a class="menu-card" href="#transfer" data-i18n="navTransfer">Transferts</a>
+          <a class="menu-card" href="#loan" data-i18n="navLoan">Prêts</a>
+          <a class="menu-card" href="#cards" data-i18n="navCards">Cartes</a>
+          <a class="menu-card" href="#services" data-i18n="navServices">Services</a>
           <a class="menu-card menu-card--settings" href="#settings">
             <svg class="menu-card__icon icon-settings" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
-            Paramètres
+            <span data-i18n="navSettings">Paramètres</span>
           </a>
         </div>
 
         <div class="card movements-card">
           <div class="section-header">
-            <h3>Historique des opérations</h3>
+            <h3 data-i18n="movementsHistory">Historique des opérations</h3>
             <div class="section-actions">
               <label class="search-field" for="movementSearch">
-                <span class="sr-only">Rechercher</span>
-                <input id="movementSearch" type="search" placeholder="Rechercher une opération…" />
+                <span class="sr-only" data-i18n="search">Rechercher</span>
+                <input id="movementSearch" type="search" data-i18n-placeholder="searchMovements" placeholder="Rechercher une opération…" />
               </label>
-              <button class="btn btn--small btn--export" type="button" id="btnExportStatement">Exporter le relevé</button>
-              <button class="btn btn--small" id="btnSort">Trier</button>
+              <button class="btn btn--small btn--export" type="button" id="btnExportStatement" data-i18n="exportStatement">Exporter le relevé</button>
+              <button class="btn btn--small" id="btnSort" data-i18n="sort">Trier</button>
               <div class="filter-buttons">
-                <button class="btn btn--small btn--filter active" data-filter="all">Tous</button>
-                <button class="btn btn--small btn--filter" data-filter="deposit">Reçus</button>
-                <button class="btn btn--small btn--filter" data-filter="withdrawal">Dépenses</button>
+                <button class="btn btn--small btn--filter active" data-filter="all" data-i18n="filterAll">Tous</button>
+                <button class="btn btn--small btn--filter" data-filter="deposit" data-i18n="filterDeposits">Reçus</button>
+                <button class="btn btn--small btn--filter" data-filter="withdrawal" data-i18n="filterWithdrawals">Dépenses</button>
               </div>
             </div>
           </div>
@@ -308,18 +308,12 @@
           <div class="card settings-card">
             <h3>Affichage et langue</h3>
             <form class="form" id="settingsPreferencesForm">
-              <label for="settingsLocale">Langue</label>
-              <select id="settingsLocale">
-                <option value="fr-FR">Français</option>
-                <option value="en-GB">English</option>
-              </select>
+              <label for="settingsLocale" data-i18n="languageLabel">Langue / région</label>
+              <select id="settingsLocale"></select>
+              <p class="settings-locale-hint" id="settingsCountryHint"></p>
 
-              <label for="settingsCurrency">Devise</label>
-              <select id="settingsCurrency">
-                <option value="EUR">Euro (€)</option>
-                <option value="USD">Dollar ($)</option>
-                <option value="GBP">Livre (£)</option>
-              </select>
+              <label for="settingsCurrency" data-i18n="currencyLabel">Devise</label>
+              <select id="settingsCurrency"></select>
 
               <label class="checkbox-label">
                 <input id="settingsHideBalanceHero" type="checkbox" />
@@ -549,6 +543,7 @@
     </main>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

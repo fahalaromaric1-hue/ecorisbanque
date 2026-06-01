@@ -794,6 +794,40 @@ input:focus {
   text-align: right;
 }
 
+.settings-locale-hint {
+  margin: -4px 0 12px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+html[dir='rtl'] .sidebar {
+  left: auto;
+  right: 0;
+  transform: translateX(100%);
+  box-shadow: -16px 0 60px rgba(15, 23, 42, 0.15);
+}
+
+html[dir='rtl'] .sidebar.open {
+  transform: translateX(0);
+}
+
+html[dir='rtl'] .movement {
+  border-left: none;
+  border-right: 4px solid transparent;
+}
+
+html[dir='rtl'] .movement--deposit {
+  border-right-color: #37b24d;
+}
+
+html[dir='rtl'] .movement--withdrawal {
+  border-right-color: #fa5252;
+}
+
+html[dir='rtl'] .settings-info-list li {
+  flex-direction: row-reverse;
+}
+
 .movements--compact .movement {
   padding: 10px 14px;
 }
