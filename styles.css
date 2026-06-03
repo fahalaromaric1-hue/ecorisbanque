@@ -380,15 +380,71 @@ button {
   color: var(--text-muted);
 }
 
-/* Connexion : menu et engrenage masqués → logo centré sur toute la largeur */
-.header:has(#btnMenu.hidden):has(#headerSettingsWrap.hidden) {
-  grid-template-columns: 1fr;
-  gap: 0;
+/* Page de connexion — logo centré dans la carte, bandeau masqué */
+.app.is-login-view .header {
+  display: none;
 }
 
-.header:has(#btnMenu.hidden):has(#headerSettingsWrap.hidden) .brand {
-  grid-column: 1;
+.app.is-login-view .main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding-top: clamp(16px, 6vh, 48px);
+}
+
+.app.is-login-view .login-card {
+  width: 100%;
+  max-width: 440px;
+  margin-top: 0;
+}
+
+.login-card__brand {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 auto 24px;
+  padding: 0 16px;
+  width: 100%;
   max-width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.app.is-login-view .login-card__brand {
+  display: flex;
+}
+
+.login-card__logo {
+  display: inline-grid;
+  place-items: center;
+  height: 48px;
+  padding: 0 20px;
+  background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  box-shadow: 0 4px 14px rgba(21, 101, 192, 0.35);
+  white-space: nowrap;
+}
+
+.login-card__tagline {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.app.is-login-view .login-card h2 {
+  text-align: center;
+}
+
+.app.is-login-view .login-note {
+  text-align: center;
 }
 
 .brand {
@@ -1708,8 +1764,14 @@ body.menu-open {
     border-radius: 10px;
   }
 
-  .header:has(#btnMenu.hidden):has(#headerSettingsWrap.hidden) .brand span {
-    font-size: 0.78rem;
+  .login-card__logo {
+    height: 44px;
+    padding: 0 14px;
+    font-size: 0.9rem;
+  }
+
+  .login-card__tagline {
+    font-size: 0.95rem;
   }
 
   .card {

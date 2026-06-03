@@ -1010,6 +1010,7 @@ let movementSearch = '';
 let chartExpanded = false;
 
 // --- DOM ---
+const appRoot = document.querySelector('.app');
 const labelWelcome = document.getElementById('welcomeMessage');
 const sidebarClientGreeting = document.getElementById('sidebarClientGreeting');
 const labelDate = document.getElementById('currentDate');
@@ -1656,6 +1657,7 @@ function showAdminPanel() {
   renderAdminUserList();
   adminSelectUser.value = '';
   fillAdminEditForm('');
+  updateLoginViewState();
 }
 
 function hideAdminPanel() {
@@ -1663,9 +1665,16 @@ function hideAdminPanel() {
   containerAdmin.classList.add('hidden');
 }
 
+function updateLoginViewState() {
+  if (!appRoot || !containerLogin) return;
+  const loginVisible = !containerLogin.classList.contains('hidden') && !isAdminSession;
+  appRoot.classList.toggle('is-login-view', loginVisible);
+}
+
 function showClientControls() {
   btnMenu.classList.remove('hidden');
   if (headerSettingsWrap) headerSettingsWrap.classList.remove('hidden');
+  updateLoginViewState();
 }
 
 function hideClientControls() {
@@ -1673,6 +1682,7 @@ function hideClientControls() {
   if (headerSettingsWrap) headerSettingsWrap.classList.add('hidden');
   setHeaderSettingsMenuOpen(false);
   closeSidebar();
+  updateLoginViewState();
 }
 
 function tryAutoLogin() {
@@ -1707,6 +1717,7 @@ function logout() {
   containerLogin.classList.remove('hidden');
   labelWelcome.textContent = 'Connectez-vous pour accéder à votre compte';
   resetClientDisplay();
+  updateLoginViewState();
   closeSidebar();
   clearSession();
   currentAccount = null;
@@ -2501,6 +2512,7 @@ async function initApp() {
 
   updateAllNavLabels();
   updateChartVisibility();
+  updateLoginViewState();
 }
 
 initApp();
