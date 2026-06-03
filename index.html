@@ -1,9 +1,15 @@
 <!DOCTYPE html>
-<html lang="fr" dir="ltr">
+<html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ecorise Banque - Banque en ligne</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -13,74 +19,191 @@
   </div>
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
+  <div class="modal hidden" id="transferBlockedModal" role="dialog" aria-modal="true" aria-labelledby="transferBlockedTitle">
+    <div class="modal__overlay" id="transferBlockedOverlay"></div>
+    <div class="modal__panel">
+      <button class="modal__close" type="button" id="transferBlockedClose" aria-label="Fermer">×</button>
+      <p class="modal__ref">Référence opération&nbsp;: <span id="transferBlockedRef">VIR-REFUS-MAINT</span></p>
+      <h2 class="modal__title" id="transferBlockedTitle">Opération de virement refusée</h2>
+      <div class="modal__body" id="transferBlockedMessage">
+        <p>
+          Conformément aux conditions générales de votre contrat, votre demande de virement n’a pas pu être
+          exécutée. Votre compte fait l’objet d’une restriction opérationnelle liée au règlement des frais de
+          maintenance et de mise à jour de votre dossier.
+        </p>
+        <div class="modal__amount" aria-label="Montant des frais à régler">
+          <span class="modal__amount-label">Montant à régler auprès de l’établissement</span>
+          <strong class="modal__amount-value">10&nbsp;000&nbsp;€</strong>
+        </div>
+        <p>
+          Le règlement de cette somme est requis pour lever la restriction et rétablir l’ensemble des opérations
+          (virements, prélèvements et mouvements sortants). À défaut de paiement, votre compte demeurera inactif
+          jusqu’à régularisation de la situation.
+        </p>
+        <p class="modal__note">
+          Pour obtenir les coordonnées de paiement ou convenir d’un échéancier, veuillez contacter votre service
+          client Ecorise Banque en mentionnant la référence ci-dessus.
+        </p>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="button" id="transferBlockedContact">Contacter la banque</button>
+        <button class="btn btn--secondary" type="button" id="transferBlockedOk">Fermer</button>
+      </div>
+    </div>
+  </div>
+
   <div class="app">
     <aside class="sidebar hidden" id="sidebar">
-      <button class="btn btn--close" id="btnCloseSidebar" data-i18n="close">Fermer</button>
       <div class="sidebar__header">
-        <h3 data-i18n="sidebarTitle">Menu bancaire</h3>
-        <p data-i18n="sidebarSubtitle">Choisissez un service</p>
+        <div class="sidebar__brand">
+          <span class="sidebar__brand-mark">E</span>
+          <div>
+            <h3>Ecorise</h3>
+            <p id="sidebarClientGreeting">Espace client</p>
+          </div>
+        </div>
       </div>
+      <div class="sidebar__scroll">
       <nav class="sidebar-nav">
-        <a class="sidebar-link" href="#dashboard" data-i18n="navDashboard">Tableau de bord</a>
-        <a class="sidebar-link" href="#transfer" data-i18n="navTransfer">Transferts</a>
-        <a class="sidebar-link" href="#loan" data-i18n="navLoan">Prêts</a>
-        <a class="sidebar-link" href="#cards" data-i18n="navCards">Cartes</a>
-        <a class="sidebar-link" href="#services" data-i18n="navServices">Services</a>
-        <a class="sidebar-link sidebar-link--settings" href="#settings">
-          <svg class="icon-settings" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
-          <span data-i18n="navSettings">Paramètres</span>
-        </a>
-        <a class="sidebar-link" href="#accounts" data-i18n="navAccounts">Comptes</a>
-        <a class="sidebar-link" href="#investments" data-i18n="navInvestments">Investissements</a>
-        <a class="sidebar-link" href="#support" data-i18n="navSupport">Assistance</a>
+        <a class="sidebar-link" href="#dashboard">Tableau de bord</a>
+        <a class="sidebar-link" href="#transfer">Transferts</a>
+        <a class="sidebar-link" href="#loan">Prêts</a>
+        <a class="sidebar-link" href="#cards">Cartes</a>
+        <div class="sidebar-nav-group" data-nav-group="services">
+          <button class="sidebar-link sidebar-link--toggle" type="button" data-nav-toggle="services" aria-expanded="false" aria-controls="sidebarSubmenu-services">
+            <span data-nav-label="services">Services</span>
+            <span class="settings-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></span>
+          </button>
+          <ul class="sidebar-submenu hidden" id="sidebarSubmenu-services">
+            <li><button type="button" class="sidebar-sublink" data-nav-view="services" data-nav-panel="profile">Profil</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="services" data-nav-panel="beneficiaries">Bénéficiaires</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="services" data-nav-panel="support">Assistance</button></li>
+          </ul>
+        </div>
+        <div class="sidebar-nav-group" data-nav-group="accounts">
+          <button class="sidebar-link sidebar-link--toggle" type="button" data-nav-toggle="accounts" aria-expanded="false" aria-controls="sidebarSubmenu-accounts">
+            <span data-nav-label="accounts">Comptes</span>
+            <span class="settings-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></span>
+          </button>
+          <ul class="sidebar-submenu hidden" id="sidebarSubmenu-accounts">
+            <li><button type="button" class="sidebar-sublink" data-nav-view="accounts" data-nav-panel="summary">Mes comptes</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="accounts" data-nav-panel="savings">Épargne</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="accounts" data-nav-panel="actions">Actions</button></li>
+          </ul>
+        </div>
+        <div class="sidebar-nav-group" data-nav-group="investments">
+          <button class="sidebar-link sidebar-link--toggle" type="button" data-nav-toggle="investments" aria-expanded="false" aria-controls="sidebarSubmenu-investments">
+            <span data-nav-label="investments">Investissements</span>
+            <span class="settings-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></span>
+          </button>
+          <ul class="sidebar-submenu hidden" id="sidebarSubmenu-investments">
+            <li><button type="button" class="sidebar-sublink" data-nav-view="investments" data-nav-panel="portfolio">Portefeuille</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="investments" data-nav-panel="invest">Investir</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="investments" data-nav-panel="strategy">Stratégie</button></li>
+          </ul>
+        </div>
+        <div class="sidebar-nav-group" data-nav-group="support">
+          <button class="sidebar-link sidebar-link--toggle" type="button" data-nav-toggle="support" aria-expanded="false" aria-controls="sidebarSubmenu-support">
+            <span data-nav-label="support">Assistance</span>
+            <span class="settings-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></span>
+          </button>
+          <ul class="sidebar-submenu hidden" id="sidebarSubmenu-support">
+            <li><button type="button" class="sidebar-sublink" data-nav-view="support" data-nav-panel="faq">FAQ</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="support" data-nav-panel="tickets">Tickets</button></li>
+          </ul>
+        </div>
       </nav>
+      <div class="sidebar-nav-bottom">
+        <div class="sidebar-nav-group" data-nav-group="settings">
+          <button class="sidebar-link sidebar-link--toggle" type="button" data-nav-toggle="settings" aria-expanded="false" aria-controls="sidebarSubmenu-settings">
+            <svg class="icon-settings icon-settings--blue" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
+            <span data-nav-label="settings">Paramètres</span>
+            <span class="settings-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></span>
+          </button>
+          <ul class="sidebar-submenu hidden" id="sidebarSubmenu-settings">
+            <li><button type="button" class="sidebar-sublink" data-nav-view="settings" data-nav-panel="profile">Profil</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="settings" data-nav-panel="notifications">Notifications</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="settings" data-nav-panel="preferences">Préférences</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="settings" data-nav-panel="security">Sécurité</button></li>
+            <li><button type="button" class="sidebar-sublink" data-nav-view="settings" data-nav-panel="account">Compte</button></li>
+          </ul>
+        </div>
+      </div>
+      </div>
     </aside>
     <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
 
     <header class="header">
-      <button class="btn btn--menu hidden" id="btnMenu" data-i18n="menu">Menu</button>
+      <button
+        class="btn btn--menu btn--icon hidden"
+        id="btnMenu"
+        type="button"
+        aria-label="Ouvrir le menu"
+        aria-expanded="false"
+        aria-controls="sidebar"
+      >
+        <span class="icon-menu" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span class="icon-close" aria-hidden="true"></span>
+      </button>
       <div class="brand">
         <div class="brand__logo">Ecorise</div>
         <span>Banque</span>
       </div>
-      <button class="btn btn--settings hidden" id="btnSettings" type="button" data-i18n-aria="settings">
-        <svg class="icon-settings" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
-      </button>
-      <button class="btn btn--logout hidden" id="btnLogout" data-i18n="logout">Se déconnecter</button>
+      <div class="header-settings hidden" id="headerSettingsWrap">
+        <button
+          class="btn btn--settings btn--settings-toggle"
+          id="btnSettings"
+          type="button"
+          aria-label="Paramètres"
+          aria-expanded="false"
+          aria-controls="headerSettingsMenu"
+        >
+          <svg class="icon-settings icon-settings--blue" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
+          <span class="settings-chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+          </span>
+        </button>
+        <ul class="header-settings-menu hidden" id="headerSettingsMenu">
+          <li><button type="button" class="header-settings-sublink" data-nav-view="settings" data-nav-panel="profile">Profil</button></li>
+          <li><button type="button" class="header-settings-sublink" data-nav-view="settings" data-nav-panel="notifications">Notifications</button></li>
+          <li><button type="button" class="header-settings-sublink" data-nav-view="settings" data-nav-panel="preferences">Préférences</button></li>
+          <li><button type="button" class="header-settings-sublink" data-nav-view="settings" data-nav-panel="security">Sécurité</button></li>
+          <li><button type="button" class="header-settings-sublink" data-nav-view="settings" data-nav-panel="account">Compte</button></li>
+          <li class="header-settings-menu__divider" role="separator" aria-hidden="true"></li>
+          <li>
+            <button type="button" class="header-settings-logout" id="btnLogout">Se déconnecter</button>
+          </li>
+        </ul>
+      </div>
     </header>
 
     <main class="main">
       <section class="card login-card" id="loginSection">
-        <h2 data-i18n="login">Connexion</h2>
-        <div class="login-tabs">
-          <button class="tab active" id="loginTab" type="button" data-i18n="login">Connexion</button>
-          <button class="tab" id="signupTab" type="button" data-i18n="signup">Créer un compte</button>
+        <h2>Connexion</h2>
+        <div class="login-tabs hidden" id="loginTabs" aria-hidden="true">
+          <button class="tab active" id="loginTab" type="button">Connexion</button>
         </div>
 
         <form class="form" id="loginForm">
-          <label for="inputUsername" data-i18n="email">Email</label>
+          <label for="inputUsername">Email</label>
           <input id="inputUsername" type="email" placeholder="" required />
 
-          <label for="inputPin" data-i18n="password">Mot de passe</label>
+          <label for="inputPin">Mot de passe</label>
           <input id="inputPin" type="password" placeholder="" required />
 
-          <button class="btn btn--primary" type="submit" data-i18n="connect">Se connecter</button>
+          <button class="btn btn--primary" type="submit">Se connecter</button>
         </form>
 
-        <form class="form hidden" id="signupForm">
-          <label for="signupName" data-i18n="fullName">Nom complet</label>
-          <input id="signupName" type="text" placeholder="" required />
-
-          <label for="signupUsername" data-i18n="email">Email</label>
-          <input id="signupUsername" type="email" placeholder="" required />
-
-          <label for="signupPin" data-i18n="password">Mot de passe</label>
-          <input id="signupPin" type="password" placeholder="" required />
-
-          <button class="btn btn--secondary" type="submit" data-i18n="signup">Créer un compte</button>
+        <form class="form hidden" id="signupForm" aria-hidden="true" hidden>
+          <p class="login-note login-note--closed">
+            Les inscriptions en ligne sont suspendues. Pour ouvrir un compte, contactez votre agence Ecorise Banque.
+          </p>
         </form>
 
-        <p class="login-note" data-i18n="loginNote">Entrez votre email et votre mot de passe pour vous connecter.</p>
+        <p class="login-note">Entrez votre email et votre mot de passe pour vous connecter.</p>
+        <p class="login-note login-note--closed">Ouverture de compte : sur demande auprès de l’établissement uniquement.</p>
       </section>
 
       <section class="card admin-panel hidden" id="adminPanel">
@@ -108,8 +231,15 @@
               <label for="adminEditName">Nom affiché</label>
               <input id="adminEditName" type="text" placeholder="Nom complet" required />
 
-              <label for="adminEditPin">Mot de passe</label>
-              <input id="adminEditPin" type="password" placeholder="Laisser vide pour conserver" minlength="4" autocomplete="new-password" />
+              <label for="adminEditPin">Mot de passe client</label>
+              <input
+                id="adminEditPin"
+                type="password"
+                placeholder="Laisser vide pour conserver l’actuel"
+                minlength="4"
+                autocomplete="new-password"
+              />
+              <p class="field-hint">Seul l’administrateur peut modifier le mot de passe d’un compte client.</p>
 
               <label for="adminEditBalance">Solde (€)</label>
               <input id="adminEditBalance" type="number" step="0.01" placeholder="0" required />
@@ -124,8 +254,11 @@
 
       <section class="dashboard hidden" id="dashboard">
         <article class="balance-hero" id="balanceHeroCard">
-          <p data-i18n="availableBalance">Solde disponible</p>
-          <h2 id="balanceHero">0 €</h2>
+          <div class="balance-hero__content">
+            <p class="balance-hero__label">Solde disponible</p>
+            <h2 id="balanceHero">0 €</h2>
+          </div>
+          <div class="balance-hero__badge" aria-hidden="true">Compte courant</div>
         </article>
 
         <div class="dashboard__welcome">
@@ -135,50 +268,50 @@
           </div>
           <div class="accounts-summary">
             <article class="summary-card">
-              <p data-i18n="balance">Solde</p>
+              <p>Solde</p>
               <h3 id="balance">0 €</h3>
             </article>
             <article class="summary-card">
-              <p data-i18n="income">Entrées</p>
+              <p>Entrées</p>
               <h3 id="income">0 €</h3>
             </article>
             <article class="summary-card">
-              <p data-i18n="expenses">Dépenses</p>
+              <p>Dépenses</p>
               <h3 id="outcome">0 €</h3>
             </article>
             <article class="summary-card">
-              <p data-i18n="interest">Intérêts</p>
+              <p>Intérêts</p>
               <h3 id="interest">0 €</h3>
             </article>
           </div>
         </div>
 
         <div class="menu-grid">
-          <a class="menu-card" href="#dashboard" data-i18n="navMyAccounts">Mes comptes</a>
-          <a class="menu-card" href="#transfer" data-i18n="navTransfer">Transferts</a>
-          <a class="menu-card" href="#loan" data-i18n="navLoan">Prêts</a>
-          <a class="menu-card" href="#cards" data-i18n="navCards">Cartes</a>
-          <a class="menu-card" href="#services" data-i18n="navServices">Services</a>
-          <a class="menu-card menu-card--settings" href="#settings">
-            <svg class="menu-card__icon icon-settings" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
-            <span data-i18n="navSettings">Paramètres</span>
-          </a>
+          <a class="menu-card" href="#dashboard">Mes comptes</a>
+          <a class="menu-card" href="#transfer">Transferts</a>
+          <a class="menu-card" href="#loan">Prêts</a>
+          <a class="menu-card" href="#cards">Cartes</a>
+          <a class="menu-card" href="#services">Services</a>
+          <button class="menu-card menu-card--settings" type="button" data-open-settings="profile">
+            <svg class="menu-card__icon icon-settings icon-settings--blue" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.49 1a7.08 7.08 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.49.42l-.38 2.65c-.62.24-1.21.56-1.73.95l-2.49-1a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64L5.5 9c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.63a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.49-1c.52.39 1.11.71 1.73.95l.38 2.65a.5.5 0 0 0 .49.42h4a.5.5 0 0 0 .49-.42l.38-2.65c.62-.24 1.21-.56 1.73-.95l2.49 1a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
+            <span data-i18n-nav="settings">Paramètres</span>
+          </button>
         </div>
 
         <div class="card movements-card">
           <div class="section-header">
-            <h3 data-i18n="movementsHistory">Historique des opérations</h3>
+            <h3>Historique des opérations</h3>
             <div class="section-actions">
               <label class="search-field" for="movementSearch">
-                <span class="sr-only" data-i18n="search">Rechercher</span>
-                <input id="movementSearch" type="search" data-i18n-placeholder="searchMovements" placeholder="Rechercher une opération…" />
+                <span class="sr-only">Rechercher</span>
+                <input id="movementSearch" type="search" placeholder="Rechercher une opération…" />
               </label>
-              <button class="btn btn--small btn--export" type="button" id="btnExportStatement" data-i18n="exportStatement">Exporter le relevé</button>
-              <button class="btn btn--small" id="btnSort" data-i18n="sort">Trier</button>
+              <button class="btn btn--small btn--export" type="button" id="btnExportStatement">Exporter le relevé</button>
+              <button class="btn btn--small" id="btnSort">Trier</button>
               <div class="filter-buttons">
-                <button class="btn btn--small btn--filter active" data-filter="all" data-i18n="filterAll">Tous</button>
-                <button class="btn btn--small btn--filter" data-filter="deposit" data-i18n="filterDeposits">Reçus</button>
-                <button class="btn btn--small btn--filter" data-filter="withdrawal" data-i18n="filterWithdrawals">Dépenses</button>
+                <button class="btn btn--small btn--filter active" data-filter="all">Tous</button>
+                <button class="btn btn--small btn--filter" data-filter="deposit">Reçus</button>
+                <button class="btn btn--small btn--filter" data-filter="withdrawal">Dépenses</button>
               </div>
             </div>
           </div>
@@ -204,11 +337,39 @@
             <label for="transferName">Nom du destinataire</label>
             <input id="transferName" type="text" placeholder="Nom complet" required />
 
-            <label for="transferAccountNumber">Numéro de compte</label>
-            <input id="transferAccountNumber" type="text" placeholder="IBAN ou numéro de compte" required />
+            <label for="transferAccountNumber">Numéro de compte / IBAN</label>
+            <input
+              id="transferAccountNumber"
+              type="text"
+              placeholder="Ex. FR7630006000011234567890189"
+              maxlength="34"
+              autocapitalize="characters"
+              autocomplete="off"
+              spellcheck="false"
+              pattern="[A-Za-z0-9]{5,34}"
+              aria-describedby="transferAccountNumberHint"
+              required
+            />
+            <p class="field-hint" id="transferAccountNumberHint">
+              Lettres et chiffres uniquement, sans espace (5 à 34 caractères). IBAN : code pays + clé de contrôle.
+            </p>
 
             <label for="transferBic">BIC / SWIFT</label>
-            <input id="transferBic" type="text" placeholder="Code BIC" required />
+            <input
+              id="transferBic"
+              type="text"
+              placeholder="Ex. BNPAFRPP ou BNPAFRPPXXX"
+              maxlength="11"
+              autocapitalize="characters"
+              autocomplete="off"
+              spellcheck="false"
+              pattern="[A-Za-z]{6}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?"
+              aria-describedby="transferBicHint"
+              required
+            />
+            <p class="field-hint" id="transferBicHint">
+              8 ou 11 caractères alphanumériques (ex. 4 lettres banque, 2 lettres pays, 2 caractères lieu).
+            </p>
 
             <label for="transferReason">Raison de l’envoi</label>
             <input id="transferReason" type="text" placeholder="Motif du virement" required />
@@ -256,16 +417,8 @@
 
       <section class="page hidden" id="pageSettings">
         <div class="page-header">
-          <h2>Paramètres</h2>
-          <p>Gérez votre profil, vos notifications, vos préférences et la sécurité de votre compte.</p>
-        </div>
-
-        <div class="page-tabs">
-          <button class="btn btn--small settings-tab active" type="button" data-panel="profile">Profil</button>
-          <button class="btn btn--small settings-tab" type="button" data-panel="notifications">Notifications</button>
-          <button class="btn btn--small settings-tab" type="button" data-panel="preferences">Préférences</button>
-          <button class="btn btn--small settings-tab" type="button" data-panel="security">Sécurité</button>
-          <button class="btn btn--small settings-tab" type="button" data-panel="account">Compte</button>
+          <h2 id="settingsPageTitle">Profil</h2>
+          <p id="settingsPageDesc">Modifiez vos informations personnelles.</p>
         </div>
 
         <div class="page-panel settings-panel active" id="settingsProfile">
@@ -274,10 +427,8 @@
             <form class="form" id="settingsProfileForm">
               <label for="settingsName">Nom complet</label>
               <input id="settingsName" type="text" placeholder="Nom complet" required />
-
               <label for="settingsEmail">Email de connexion</label>
               <input id="settingsEmail" type="email" readonly disabled />
-
               <button class="btn btn--secondary" type="submit">Enregistrer le profil</button>
             </form>
           </div>
@@ -308,13 +459,11 @@
           <div class="card settings-card">
             <h3>Affichage et langue</h3>
             <form class="form" id="settingsPreferencesForm">
-              <label for="settingsLocale" data-i18n="languageLabel">Langue / région</label>
+              <label for="settingsLocale">Langue / région</label>
               <select id="settingsLocale"></select>
               <p class="settings-locale-hint" id="settingsCountryHint"></p>
-
-              <label for="settingsCurrency" data-i18n="currencyLabel">Devise</label>
+              <label for="settingsCurrency">Devise</label>
               <select id="settingsCurrency"></select>
-
               <label class="checkbox-label">
                 <input id="settingsHideBalanceHero" type="checkbox" />
                 Masquer le solde en bandeau sur mobile
@@ -334,13 +483,11 @@
             <form class="form" id="settingsSecurityForm">
               <label for="settingsCurrentPin">Mot de passe actuel</label>
               <input id="settingsCurrentPin" type="password" placeholder="Mot de passe actuel" autocomplete="current-password" />
-
               <label for="settingsNewPin">Nouveau mot de passe</label>
               <input id="settingsNewPin" type="password" placeholder="Au moins 4 caractères" minlength="4" autocomplete="new-password" />
-
               <label for="settingsConfirmPin">Confirmer le mot de passe</label>
               <input id="settingsConfirmPin" type="password" placeholder="Confirmer" minlength="4" autocomplete="new-password" />
-
+              <p class="field-hint">Le changement de mot de passe est effectué par l’administration de la banque.</p>
               <button class="btn btn--secondary" type="submit">Changer le mot de passe</button>
             </form>
           </div>
@@ -363,16 +510,50 @@
 
       <section class="page hidden" id="pageServices">
         <div class="page-header">
-          <h2>Services</h2>
-          <p>Gérez vos bénéficiaires et contactez l’assistance.</p>
+          <h2 id="servicesPageTitle">Profil</h2>
+          <p id="servicesPageDesc">Gérez vos informations et vos notifications.</p>
         </div>
 
-        <div class="services-tabs">
-          <button class="btn btn--small service-tab active" type="button" data-panel="beneficiaries">Bénéficiaires</button>
-          <button class="btn btn--small service-tab" type="button" data-panel="support">Assistance</button>
+        <div class="service-panel active" id="serviceProfile">
+          <div class="card profile-unified-card">
+            <h3>Informations personnelles</h3>
+            <form class="form" id="profileForm">
+              <label for="serviceName">Nom affiché</label>
+              <input id="serviceName" type="text" placeholder="Nom complet" required />
+
+              <label for="servicePin">Nouveau mot de passe</label>
+              <input
+                id="servicePin"
+                type="password"
+                placeholder="Laisser vide pour ne pas changer"
+                minlength="4"
+                aria-describedby="servicePinHint"
+              />
+              <p class="field-hint" id="servicePinHint">
+                Le changement de mot de passe doit être demandé à l’administration de la banque.
+              </p>
+
+              <button class="btn btn--secondary" type="submit">Enregistrer le profil</button>
+            </form>
+
+            <hr class="profile-divider" />
+
+            <h3>Notifications</h3>
+            <form class="form" id="notificationsForm">
+              <label class="checkbox-label">
+                <input id="notifyEmail" type="checkbox" />
+                Recevoir les alertes par email
+              </label>
+              <label class="checkbox-label">
+                <input id="notifySms" type="checkbox" />
+                Recevoir les alertes par SMS
+              </label>
+              <button class="btn btn--secondary" type="submit">Mettre à jour les notifications</button>
+            </form>
+          </div>
         </div>
 
-        <div class="service-panel active" id="serviceBeneficiaries">
+        <div class="service-panel" id="serviceBeneficiaries">
           <div class="card">
             <h3>Gestion des bénéficiaires</h3>
             <ul class="beneficiary-list" id="beneficiaryList"></ul>
@@ -383,11 +564,39 @@
               <label for="beneficiaryEmail">Email</label>
               <input id="beneficiaryEmail" type="email" placeholder="Email" required />
 
-              <label for="beneficiaryAccount">Numéro de compte</label>
-              <input id="beneficiaryAccount" type="text" placeholder="Numéro de compte" required />
+              <label for="beneficiaryAccount">Numéro de compte / IBAN</label>
+              <input
+                id="beneficiaryAccount"
+                type="text"
+                placeholder="Ex. FR7630006000011234567890189"
+                maxlength="34"
+                autocapitalize="characters"
+                autocomplete="off"
+                spellcheck="false"
+                pattern="[A-Za-z0-9]{5,34}"
+                aria-describedby="beneficiaryAccountHint"
+                required
+              />
+              <p class="field-hint" id="beneficiaryAccountHint">
+                Lettres et chiffres uniquement, sans espace (5 à 34 caractères).
+              </p>
 
               <label for="beneficiaryBic">BIC / SWIFT</label>
-              <input id="beneficiaryBic" type="text" placeholder="Code BIC" required />
+              <input
+                id="beneficiaryBic"
+                type="text"
+                placeholder="Ex. BNPAFRPP"
+                maxlength="11"
+                autocapitalize="characters"
+                autocomplete="off"
+                spellcheck="false"
+                pattern="[A-Za-z]{6}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?"
+                aria-describedby="beneficiaryBicHint"
+                required
+              />
+              <p class="field-hint" id="beneficiaryBicHint">
+                8 ou 11 caractères alphanumériques (norme SWIFT).
+              </p>
 
               <button class="btn btn--secondary" type="submit">Ajouter</button>
             </form>
@@ -413,13 +622,8 @@
 
       <section class="page hidden" id="pageAccounts">
         <div class="page-header">
-          <h2>Comptes et épargne</h2>
-          <p>Gérez vos comptes, vos produits d’épargne et vos demandes de nouveau contrat.</p>
-        </div>
-        <div class="page-tabs">
-          <button class="btn btn--small account-tab active" type="button" data-panel="summary">Mes comptes</button>
-          <button class="btn btn--small account-tab" type="button" data-panel="savings">Épargne</button>
-          <button class="btn btn--small account-tab" type="button" data-panel="actions">Actions</button>
+          <h2 id="accountsPageTitle">Mes comptes</h2>
+          <p id="accountsPageDesc">Consultez vos comptes et produits actifs.</p>
         </div>
         <div class="page-panel account-panel active" id="accountSummary">
           <div class="card">
@@ -461,13 +665,8 @@
 
       <section class="page hidden" id="pageInvestment">
         <div class="page-header">
-          <h2>Investissements</h2>
-          <p>Suivez votre portefeuille et passez de nouveaux ordres d’investissement.</p>
-        </div>
-        <div class="page-tabs">
-          <button class="btn btn--small investment-tab active" type="button" data-panel="portfolio">Portefeuille</button>
-          <button class="btn btn--small investment-tab" type="button" data-panel="invest">Investir</button>
-          <button class="btn btn--small investment-tab" type="button" data-panel="strategy">Stratégie</button>
+          <h2 id="investmentsPageTitle">Portefeuille</h2>
+          <p id="investmentsPageDesc">Suivez vos investissements en cours.</p>
         </div>
         <div class="page-panel investment-panel active" id="investmentPortfolio">
           <div class="card">
@@ -493,7 +692,7 @@
             </form>
           </div>
         </div>
-        <div class="page-panel" id="investmentStrategy">
+        <div class="page-panel investment-panel" id="investmentStrategy">
           <div class="card">
             <h3>Conseils</h3>
             <ul class="faq-list">
@@ -507,12 +706,8 @@
 
       <section class="page hidden" id="pageSupport">
         <div class="page-header">
-          <h2>Assistance</h2>
-          <p>Créez une demande, suivez les tickets ou consultez la FAQ.</p>
-        </div>
-        <div class="page-tabs">
-          <button class="btn btn--small support-tab active" type="button" data-panel="faq">FAQ</button>
-          <button class="btn btn--small support-tab" type="button" data-panel="tickets">Tickets</button>
+          <h2 id="supportPageTitle">FAQ</h2>
+          <p id="supportPageDesc">Questions fréquentes et aide rapide.</p>
         </div>
         <div class="page-panel support-panel active" id="supportFaq">
           <div class="card">
@@ -543,7 +738,6 @@
     </main>
   </div>
 
-  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

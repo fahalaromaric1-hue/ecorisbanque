@@ -4,6 +4,7 @@ const ADMIN = {
 };
 
 const SESSION_KEY = 'ebank_session_v1';
+const SIGNUP_ENABLED = false;
 const ACCOUNTS_KEY = 'ebank_accounts_v1';
 const ACCOUNTS_API = '/api/accounts';
 
@@ -27,6 +28,158 @@ const MOVEMENT_LABEL_TRANSLATIONS = {
 const isMobileView = () =>
   window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
 
+const BANK_ACCOUNT_MIN_LEN = 5;
+const BANK_ACCOUNT_MAX_LEN = 34;
+const BIC_LEN_SHORT = 8;
+const BIC_LEN_LONG = 11;
+
+const BANK_ACCOUNT_PATTERN = /^[A-Z0-9]{5,34}$/;
+const IBAN_PATTERN = /^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/;
+const BIC_PATTERN = /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
+
+function normalizeBankAccountInput(raw) {
+  return String(raw || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, BANK_ACCOUNT_MAX_LEN);
+}
+
+function normalizeBicInput(raw) {
+  return String(raw || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, BIC_LEN_LONG);
+}
+
+function ibanCheckDigitsValid(iban) {
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  const expanded = rearranged.replace(/[A-Z]/g, c => (c.charCodeAt(0) - 55).toString());
+  let remainder = 0;
+  for (let i = 0; i < expanded.length; i += 7) {
+    remainder = parseInt(String(remainder) + expanded.slice(i, i + 7), 10) % 97;
+  }
+  return remainder === 1;
+}
+
+function isIbanFormat(value) {
+  return (
+    value.length >= 15 &&
+    value.length <= BANK_ACCOUNT_MAX_LEN &&
+    IBAN_PATTERN.test(value)
+  );
+}
+
+function isValidBankAccount(normalized) {
+  if (!BANK_ACCOUNT_PATTERN.test(normalized)) return false;
+  if (isIbanFormat(normalized)) return ibanCheckDigitsValid(normalized);
+  return normalized.length >= BANK_ACCOUNT_MIN_LEN;
+}
+
+function isValidBic(normalized) {
+  return BIC_PATTERN.test(normalized);
+}
+
+function validateBankAccountField(raw) {
+  const value = normalizeBankAccountInput(raw);
+  if (!value) {
+    return { ok: false, value, message: 'Indiquez un numéro de compte ou un IBAN.' };
+  }
+  if (!BANK_ACCOUNT_PATTERN.test(value)) {
+    return {
+      ok: false,
+      value,
+      message:
+        'Numéro de compte invalide : lettres et chiffres uniquement (5 à 34 caractères).',
+    };
+  }
+  if (isIbanFormat(value) && !ibanCheckDigitsValid(value)) {
+    return { ok: false, value, message: 'IBAN invalide : vérifiez le numéro saisi.' };
+  }
+  if (!isValidBankAccount(value)) {
+    return {
+      ok: false,
+      value,
+      message: `Le numéro de compte doit comporter entre ${BANK_ACCOUNT_MIN_LEN} et ${BANK_ACCOUNT_MAX_LEN} caractères.`,
+    };
+  }
+  return { ok: true, value };
+}
+
+function validateBicField(raw) {
+  const value = normalizeBicInput(raw);
+  if (!value) {
+    return { ok: false, value, message: 'Indiquez le code BIC / SWIFT.' };
+  }
+  if (!isValidBic(value)) {
+    return {
+      ok: false,
+      value,
+      message:
+        'Code BIC invalide : 8 ou 11 caractères (4 lettres banque, 2 lettres pays, 2 caractères lieu, optionnel 3 caractères agence). Ex. BNPAFRPP.',
+    };
+  }
+  return { ok: true, value };
+}
+
+function openTransferBlockedModal() {
+  if (!transferBlockedModal) return;
+  transferBlockedModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  transferBlockedOk?.focus();
+}
+
+function closeTransferBlockedModal() {
+  if (!transferBlockedModal) return;
+  transferBlockedModal.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+const TRANSFER_BLOCKED_REF = 'VIR-REFUS-MAINT';
+
+function openTransferSupportContact() {
+  closeTransferBlockedModal();
+  if (!currentAccount) return;
+
+  showView('support', { navPanel: 'tickets' });
+
+  if (ticketSubject) {
+    ticketSubject.value = `Règlement frais de maintenance — ${TRANSFER_BLOCKED_REF}`;
+  }
+  if (ticketMessage) {
+    ticketMessage.value =
+      'Bonjour,\n\n' +
+      'Je souhaite obtenir les coordonnées bancaires pour le règlement des frais de maintenance et de mise à jour ' +
+      '(10 000 €) mentionnés lors du refus de mon virement.\n\n' +
+      `Référence : ${TRANSFER_BLOCKED_REF}\n` +
+      `Compte : ${currentAccount.username}\n\n` +
+      'Merci de m’indiquer la procédure et les délais de réactivation de mon compte.\n\n' +
+      'Cordialement.';
+  }
+
+  ticketSubject?.focus();
+  showInfo('Formulaire d’assistance prérempli — complétez et envoyez votre demande.');
+}
+
+function attachBankFieldSanitizer(input, type) {
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const normalized =
+      type === 'bic' ? normalizeBicInput(input.value) : normalizeBankAccountInput(input.value);
+    if (input.value !== normalized) {
+      const pos = input.selectionStart;
+      input.value = normalized;
+      const nextPos = Math.min(pos ?? normalized.length, normalized.length);
+      input.setSelectionRange(nextPos, nextPos);
+    }
+  });
+}
+
+function bindBankingInputs() {
+  attachBankFieldSanitizer(document.getElementById('transferAccountNumber'), 'account');
+  attachBankFieldSanitizer(document.getElementById('transferBic'), 'bic');
+  attachBankFieldSanitizer(document.getElementById('beneficiaryAccount'), 'account');
+  attachBankFieldSanitizer(document.getElementById('beneficiaryBic'), 'bic');
+}
 
 const defaultAccounts = [
   {
@@ -104,8 +257,8 @@ function saveAccounts(data) {
 function replaceAccounts(nextAccounts) {
   accounts.length = 0;
   nextAccounts.forEach(account => {
-    ensureAccountSettings(account);
     regularizeMovementHistory(account);
+    ensureAccountSettings(account);
     accounts.push(account);
   });
 }
@@ -161,9 +314,9 @@ const formatMovementDate = (date, locale) => {
 
   const daysPassed = calcDaysPassed(new Date(), date);
   let dayLabel;
-  if (daysPassed === 0) dayLabel = t('today', locale);
-  else if (daysPassed === 1) dayLabel = t('yesterday', locale);
-  else if (daysPassed <= 7) dayLabel = t('daysAgo', locale, { n: daysPassed });
+  if (daysPassed === 0) dayLabel = 'Aujourd’hui';
+  else if (daysPassed === 1) dayLabel = 'Hier';
+  else if (daysPassed <= 7) dayLabel = `Il y a ${daysPassed} jours`;
   else {
     dayLabel = new Intl.DateTimeFormat(locale, {
       day: '2-digit',
@@ -423,32 +576,181 @@ const ensureStatementCoherent = account => {
   }
 };
 
-const createAccount = (owner, username, pin) => {
-  const locale = detectBrowserLocale();
-  return {
-  owner,
-  username,
-  pin,
-  movements: [0],
-  movementDates: [],
-  interestRate: 1.2,
-  locale,
-  currency: getLocaleCurrency(locale),
-  notifications: { email: true, sms: false, operations: false },
-  preferences: {
-    hideBalanceHero: false,
-    compactMovements: false,
-    maskBalances: false,
-  },
-  beneficiaries: [],
-  accountProducts: [{ name: 'Compte courant', status: 'Actif' }],
-  savings: [{ name: 'Livret A', balance: 0 }],
-  investments: [],
-  supportRequests: [],
-};
+const LOCALE_OPTIONS = {
+  'fr-FR': { label: 'Français (France)', country: 'France', currency: 'EUR' },
+  'fr-CA': { label: 'Français (Canada)', country: 'Canada', currency: 'CAD' },
+  'en-GB': { label: 'English (UK)', country: 'United Kingdom', currency: 'GBP' },
+  'en-US': { label: 'English (US)', country: 'United States', currency: 'USD' },
+  'de-DE': { label: 'Deutsch', country: 'Deutschland', currency: 'EUR' },
+  'es-ES': { label: 'Español', country: 'España', currency: 'EUR' },
 };
 
-const ensureAccountSettings = account => {
+const CURRENCY_OPTIONS = [
+  { code: 'EUR', label: 'Euro (EUR)' },
+  { code: 'USD', label: 'Dollar US (USD)' },
+  { code: 'GBP', label: 'Livre sterling (GBP)' },
+  { code: 'CAD', label: 'Dollar canadien (CAD)' },
+];
+
+const NAV_SECTIONS = {
+  services: {
+    panels: ['profile', 'beneficiaries', 'support'],
+    defaultPanel: 'profile',
+    prefix: 'service',
+    panelSelector: '.service-panel',
+    titleId: 'servicesPageTitle',
+    descId: 'servicesPageDesc',
+  },
+  settings: {
+    panels: ['profile', 'notifications', 'preferences', 'security', 'account'],
+    defaultPanel: 'profile',
+    prefix: 'settings',
+    panelSelector: '.settings-panel',
+    titleId: 'settingsPageTitle',
+    descId: 'settingsPageDesc',
+  },
+  accounts: {
+    panels: ['summary', 'savings', 'actions'],
+    defaultPanel: 'summary',
+    prefix: 'account',
+    panelSelector: '.account-panel',
+    titleId: 'accountsPageTitle',
+    descId: 'accountsPageDesc',
+  },
+  investments: {
+    panels: ['portfolio', 'invest', 'strategy'],
+    defaultPanel: 'portfolio',
+    prefix: 'investment',
+    panelSelector: '.investment-panel',
+    titleId: 'investmentsPageTitle',
+    descId: 'investmentsPageDesc',
+  },
+  support: {
+    panels: ['faq', 'tickets'],
+    defaultPanel: 'faq',
+    prefix: 'support',
+    panelSelector: '.support-panel',
+    titleId: 'supportPageTitle',
+    descId: 'supportPageDesc',
+  },
+};
+
+const NAV_VIEWS_WITH_PANELS = Object.keys(NAV_SECTIONS);
+
+const NAV_UI = {
+  fr: {
+    services: {
+      nav: 'Services',
+      panels: {
+        profile: { title: 'Profil', desc: 'Informations personnelles et notifications.' },
+        beneficiaries: { title: 'Bénéficiaires', desc: 'Gérez vos bénéficiaires de virement.' },
+        support: { title: 'Assistance', desc: 'Contactez le support par message.' },
+      },
+    },
+    settings: {
+      nav: 'Paramètres',
+      panels: {
+        profile: { title: 'Profil', desc: 'Modifiez vos informations personnelles.' },
+        notifications: { title: 'Notifications', desc: 'Gérez vos alertes email, SMS et opérations.' },
+        preferences: { title: 'Préférences', desc: 'Langue, devise et affichage.' },
+        security: { title: 'Sécurité', desc: 'Mot de passe et protection du compte.' },
+        account: { title: 'Compte', desc: 'Informations et confidentialité.' },
+      },
+    },
+    accounts: {
+      nav: 'Comptes',
+      panels: {
+        summary: { title: 'Mes comptes', desc: 'Consultez vos comptes actifs.' },
+        savings: { title: 'Épargne', desc: 'Produits d’épargne et soldes.' },
+        actions: { title: 'Actions', desc: 'Demander ou fermer un produit.' },
+      },
+    },
+    investments: {
+      nav: 'Investissements',
+      panels: {
+        portfolio: { title: 'Portefeuille', desc: 'Suivez vos investissements.' },
+        invest: { title: 'Investir', desc: 'Passez un nouvel ordre.' },
+        strategy: { title: 'Stratégie', desc: 'Conseils et bonnes pratiques.' },
+      },
+    },
+    support: {
+      nav: 'Assistance',
+      panels: {
+        faq: { title: 'FAQ', desc: 'Questions fréquentes.' },
+        tickets: { title: 'Tickets', desc: 'Vos demandes au support.' },
+      },
+    },
+  },
+  en: {
+    services: {
+      nav: 'Services',
+      panels: {
+        profile: { title: 'Profile', desc: 'Personal info and notifications.' },
+        beneficiaries: { title: 'Beneficiaries', desc: 'Manage transfer beneficiaries.' },
+        support: { title: 'Support', desc: 'Contact support by message.' },
+      },
+    },
+    settings: {
+      nav: 'Settings',
+      panels: {
+        profile: { title: 'Profile', desc: 'Update personal information.' },
+        notifications: { title: 'Notifications', desc: 'Email, SMS and alert settings.' },
+        preferences: { title: 'Preferences', desc: 'Language, currency and display.' },
+        security: { title: 'Security', desc: 'Password and account protection.' },
+        account: { title: 'Account', desc: 'Account info and privacy.' },
+      },
+    },
+    accounts: {
+      nav: 'Accounts',
+      panels: {
+        summary: { title: 'My accounts', desc: 'View active accounts.' },
+        savings: { title: 'Savings', desc: 'Savings products and balances.' },
+        actions: { title: 'Actions', desc: 'Request or close a product.' },
+      },
+    },
+    investments: {
+      nav: 'Investments',
+      panels: {
+        portfolio: { title: 'Portfolio', desc: 'Track your investments.' },
+        invest: { title: 'Invest', desc: 'Place a new order.' },
+        strategy: { title: 'Strategy', desc: 'Tips and best practices.' },
+      },
+    },
+    support: {
+      nav: 'Support',
+      panels: {
+        faq: { title: 'FAQ', desc: 'Frequently asked questions.' },
+        tickets: { title: 'Tickets', desc: 'Your support requests.' },
+      },
+    },
+  },
+};
+
+const activeNavPanels = {
+  services: 'profile',
+  settings: 'profile',
+  accounts: 'summary',
+  investments: 'portfolio',
+  support: 'faq',
+};
+
+function getNavLang(locale = currentAccount?.locale || 'fr-FR') {
+  if (locale.startsWith('en')) return 'en';
+  if (locale.startsWith('de')) return 'de';
+  if (locale.startsWith('es')) return 'es';
+  return 'fr';
+}
+
+function getNavPanelFromHash(view) {
+  const section = NAV_SECTIONS[view];
+  if (!section) return null;
+  const raw = (location.hash || '').replace('#', '').trim();
+  const match = raw.match(new RegExp(`^${view}-([a-z]+)$`));
+  if (match && section.panels.includes(match[1])) return match[1];
+  return activeNavPanels[view] || section.defaultPanel;
+}
+
+function ensureAccountSettings(account) {
   if (!account.notifications) {
     account.notifications = { email: true, sms: false, operations: false };
   }
@@ -462,34 +764,22 @@ const ensureAccountSettings = account => {
       maskBalances: false,
     };
   }
-  if (!account.locale || !LOCALE_CONFIG[account.locale]) {
-    account.locale = detectBrowserLocale();
+  if (!account.locale || !LOCALE_OPTIONS[account.locale]) {
+    account.locale = 'fr-FR';
   }
   if (!account.currency) {
-    account.currency = getLocaleCurrency(account.locale);
+    account.currency = LOCALE_OPTIONS[account.locale].currency;
   }
-};
+}
 
-const formatWelcomeMessage = (owner, locale = 'fr-FR') => `${t('welcome', locale)}, ${owner.trim()}`;
-
-const setWelcomeMessage = (owner, locale) => {
-  const activeLocale = locale || currentAccount?.locale || guestLocale;
-  labelWelcome.textContent = formatWelcomeMessage(owner, activeLocale);
-};
-
-let guestLocale = detectBrowserLocale();
-
-function getActiveLocale() {
-  return currentAccount?.locale || guestLocale;
+function getLocaleCurrency(locale) {
+  return LOCALE_OPTIONS[locale]?.currency || 'EUR';
 }
 
 function populateLocaleOptions() {
   if (!settingsLocale) return;
-  settingsLocale.innerHTML = Object.entries(LOCALE_CONFIG)
-    .map(
-      ([code, cfg]) =>
-        `<option value="${code}">${cfg.label} — ${cfg.country}</option>`
-    )
+  settingsLocale.innerHTML = Object.entries(LOCALE_OPTIONS)
+    .map(([code, cfg]) => `<option value="${code}">${cfg.label} — ${cfg.country}</option>`)
     .join('');
 }
 
@@ -503,89 +793,35 @@ function populateCurrencyOptions() {
 function updateCountryHint(locale) {
   const hint = document.getElementById('settingsCountryHint');
   if (!hint) return;
-  const cfg = LOCALE_CONFIG[locale];
+  const cfg = LOCALE_OPTIONS[locale];
   if (!cfg) {
     hint.textContent = '';
     return;
   }
-  hint.textContent = `${t('countryLabel', locale)} : ${cfg.country} · ${t('currencyLabel', locale)} : ${getLocaleCurrency(locale)}`;
+  hint.textContent = `Pays : ${cfg.country} · Devise suggérée : ${getLocaleCurrency(locale)}`;
 }
 
-function applyStaticTranslations(locale) {
-  document.documentElement.lang = locale;
-  document.documentElement.dir = getLocaleDir(locale);
-  document.title = t('appTitle', locale);
-
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.textContent = t(el.dataset.i18n, locale);
-  });
-
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    el.placeholder = t(el.dataset.i18nPlaceholder, locale);
-  });
-
-  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
-    el.setAttribute('aria-label', t(el.dataset.i18nAria, locale));
-  });
-
-  const loaderText = document.getElementById('appLoaderText');
-  if (loaderText) loaderText.textContent = t('loading', locale);
-
-  filterButtons.forEach(btn => {
-    const key = btn.dataset.i18n;
-    if (key) btn.textContent = t(key, locale);
-  });
-
-  if (btnToggleChart && chartExpanded !== undefined) {
-    btnToggleChart.textContent = chartExpanded
-      ? t('hideChart', locale)
-      : t('showChart', locale);
-  }
-
-  if (btnShowMoreMovements && !btnShowMoreMovements.classList.contains('hidden') && currentAccount) {
-    updateMovementsToggle(
-      buildStatementLines(currentAccount).length,
-      containerMovements.querySelectorAll('.movement').length,
-      sorted
-    );
-  }
-}
-
-function applyAppLocale(locale = getActiveLocale()) {
-  guestLocale = locale;
-  applyStaticTranslations(locale);
-  updateCountryHint(locale);
-
-  if (currentAccount) {
-    displayDate(locale);
-    if (!containerDashboard.classList.contains('hidden')) {
-      updateUI(currentAccount);
-    }
-    if (!document.getElementById('pageSettings')?.classList.contains('hidden')) {
-      updateSettingsForms(currentAccount);
-    }
-  } else if (labelWelcome && containerLogin && !containerLogin.classList.contains('hidden')) {
-    labelWelcome.textContent = t('welcome', locale);
-  }
-}
-
-async function applyLocalePreferenceChange({ persist = true, notify = true } = {}) {
-  if (!currentAccount) return;
-
-  const locale = settingsLocale.value;
-  if (!LOCALE_CONFIG[locale]) return;
-
-  currentAccount.locale = locale;
-  currentAccount.currency = settingsCurrency.value || getLocaleCurrency(locale);
-  settingsCurrency.value = currentAccount.currency;
-  updateCountryHint(locale);
-  applyAppLocale(locale);
-
-  if (persist) {
-    await persistAccounts();
-    if (notify) showSuccess(t('localeUpdated', locale));
-  }
-}
+const createAccount = (owner, username, pin) => ({
+  owner,
+  username,
+  pin,
+  movements: [0],
+  movementDates: [],
+  interestRate: 1.2,
+  locale: 'fr-FR',
+  currency: 'EUR',
+  notifications: { email: true, sms: false, operations: false },
+  preferences: {
+    hideBalanceHero: false,
+    compactMovements: false,
+    maskBalances: false,
+  },
+  beneficiaries: [],
+  accountProducts: [{ name: 'Compte courant', status: 'Actif' }],
+  savings: [{ name: 'Livret A', balance: 0 }],
+  investments: [],
+  supportRequests: [],
+});
 
 const filterStatementLines = (lines, { filterType = 'all', searchQuery = '' }) => {
   let filtered = lines.filter(line => filterType === 'all' || line.type === filterType);
@@ -596,7 +832,7 @@ const filterStatementLines = (lines, { filterType = 'all', searchQuery = '' }) =
   return filtered.filter(line => {
     const label = line.label || line.type;
     const amountStr = String(Math.abs(line.amount));
-    const dateStr = line.date.toLocaleDateString(getActiveLocale());
+    const dateStr = line.date.toLocaleDateString('fr-FR');
     return (
       label.toLowerCase().includes(q) ||
       amountStr.includes(q) ||
@@ -775,6 +1011,7 @@ let chartExpanded = false;
 
 // --- DOM ---
 const labelWelcome = document.getElementById('welcomeMessage');
+const sidebarClientGreeting = document.getElementById('sidebarClientGreeting');
 const labelDate = document.getElementById('currentDate');
 const labelBalance = document.getElementById('balance');
 const labelBalanceHero = document.getElementById('balanceHero');
@@ -793,10 +1030,9 @@ const movementSearchInput = document.getElementById('movementSearch');
 const btnExportStatement = document.getElementById('btnExportStatement');
 
 const btnLogout = document.getElementById('btnLogout');
-const btnSettings = document.getElementById('btnSettings');
 const btnSort = document.getElementById('btnSort');
 const btnMenu = document.getElementById('btnMenu');
-const btnCloseSidebar = document.getElementById('btnCloseSidebar');
+const btnSettings = document.getElementById('btnSettings');
 const sidebar = document.getElementById('sidebar');
 const sidebarOverlay = document.getElementById('sidebarOverlay');
 const filterButtons = document.querySelectorAll('.btn--filter');
@@ -812,14 +1048,34 @@ const signupUsername = document.getElementById('signupUsername');
 const signupPin = document.getElementById('signupPin');
 
 const transferForm = document.getElementById('transferForm');
+const transferBlockedModal = document.getElementById('transferBlockedModal');
+const transferBlockedOverlay = document.getElementById('transferBlockedOverlay');
+const transferBlockedClose = document.getElementById('transferBlockedClose');
+const transferBlockedOk = document.getElementById('transferBlockedOk');
+const transferBlockedContact = document.getElementById('transferBlockedContact');
 const loanForm = document.getElementById('loanForm');
 const loanAmount = document.getElementById('loanAmount');
 
-const serviceTabs = document.querySelectorAll('.service-tab');
-const servicePanels = document.querySelectorAll('.service-panel');
+const profileForm = document.getElementById('profileForm');
+const serviceName = document.getElementById('serviceName');
+const servicePin = document.getElementById('servicePin');
+const notificationsForm = document.getElementById('notificationsForm');
+const notifyEmail = document.getElementById('notifyEmail');
+const notifySms = document.getElementById('notifySms');
+const beneficiaryList = document.getElementById('beneficiaryList');
+const addBeneficiaryForm = document.getElementById('addBeneficiaryForm');
+const beneficiaryName = document.getElementById('beneficiaryName');
+const beneficiaryEmail = document.getElementById('beneficiaryEmail');
+const beneficiaryAccount = document.getElementById('beneficiaryAccount');
+const beneficiaryBic = document.getElementById('beneficiaryBic');
+const supportForm = document.getElementById('supportForm');
+const supportSubject = document.getElementById('supportSubject');
+const supportMessage = document.getElementById('supportMessage');
 
-const settingsTabs = document.querySelectorAll('.settings-tab');
-const settingsPanels = document.querySelectorAll('.settings-panel');
+const settingsPageTitle = document.getElementById('settingsPageTitle');
+const settingsPageDesc = document.getElementById('settingsPageDesc');
+const headerSettingsWrap = document.getElementById('headerSettingsWrap');
+const headerSettingsMenu = document.getElementById('headerSettingsMenu');
 const settingsProfileForm = document.getElementById('settingsProfileForm');
 const settingsName = document.getElementById('settingsName');
 const settingsEmail = document.getElementById('settingsEmail');
@@ -839,19 +1095,7 @@ const settingsConfirmPin = document.getElementById('settingsConfirmPin');
 const settingsPrivacyForm = document.getElementById('settingsPrivacyForm');
 const settingsMaskBalances = document.getElementById('settingsMaskBalances');
 const settingsAccountInfo = document.getElementById('settingsAccountInfo');
-const balanceHeroCard = document.getElementById('balanceHeroCard');
-const beneficiaryList = document.getElementById('beneficiaryList');
-const addBeneficiaryForm = document.getElementById('addBeneficiaryForm');
-const beneficiaryName = document.getElementById('beneficiaryName');
-const beneficiaryEmail = document.getElementById('beneficiaryEmail');
-const beneficiaryAccount = document.getElementById('beneficiaryAccount');
-const beneficiaryBic = document.getElementById('beneficiaryBic');
-const supportForm = document.getElementById('supportForm');
-const supportSubject = document.getElementById('supportSubject');
-const supportMessage = document.getElementById('supportMessage');
 
-const accountTabs = document.querySelectorAll('.account-tab');
-const accountPanels = document.querySelectorAll('.account-panel');
 const accountProductList = document.getElementById('accountProductList');
 const savingsList = document.getElementById('savingsList');
 const newProductForm = document.getElementById('newProductForm');
@@ -859,14 +1103,10 @@ const newProductName = document.getElementById('newProductName');
 const closeProductForm = document.getElementById('closeProductForm');
 const closeProductName = document.getElementById('closeProductName');
 
-const investmentTabs = document.querySelectorAll('.investment-tab');
-const investmentPanels = document.querySelectorAll('.investment-panel');
 const investmentList = document.getElementById('investmentList');
 const investForm = document.getElementById('investForm');
 const investAmount = document.getElementById('investAmount');
 
-const supportTabs = document.querySelectorAll('.support-tab');
-const supportPanels = document.querySelectorAll('.support-panel');
 const ticketList = document.getElementById('ticketList');
 const ticketForm = document.getElementById('ticketForm');
 const ticketSubject = document.getElementById('ticketSubject');
@@ -929,7 +1169,7 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
   }
 
   if (lines.length === 0) {
-    containerMovements.innerHTML = `<p class="empty-state">${t('noMovements', account.locale)}</p>`;
+    containerMovements.innerHTML = '<p class="empty-state">Aucune opération disponible.</p>';
     updateMovementsToggle(0, 0, sort);
     if (statementFooter) statementFooter.classList.add('hidden');
     if (spendingChart) spendingChart.innerHTML = '';
@@ -938,13 +1178,14 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
 
   lines.forEach((line, i) => {
     const operationLabel =
-      line.label === RELEVE_LABEL_IN || line.label === RELEVE_LABEL_OUT
-        ? line.label
-        : t(line.type === 'deposit' ? 'deposit' : 'withdrawal', account.locale);
+      MOVEMENT_LABEL_TRANSLATIONS[line.label] ||
+      MOVEMENT_LABEL_TRANSLATIONS[line.type] ||
+      line.label ||
+      line.type;
     const balanceAfter = balanceByIndex.get(line.index);
     const balanceHtml =
       !sort && balanceAfter !== undefined
-        ? `<p class="movement-balance">${t('movementBalance', account.locale)} : ${formatCurrency(balanceAfter, account.locale, account.currency)}</p>`
+        ? `<p class="movement-balance">Solde : ${formatCurrency(balanceAfter, account.locale, account.currency)}</p>`
         : '';
 
     containerMovements.insertAdjacentHTML(
@@ -971,7 +1212,6 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
 function updateMovementsToggle(total, shown, sort) {
   if (!btnShowMoreMovements) return;
 
-  const locale = currentAccount?.locale || guestLocale;
   const onMobile = isMobileView();
   const hasMore = total > MOBILE_PREVIEW_MOVEMENTS;
 
@@ -981,12 +1221,11 @@ function updateMovementsToggle(total, shown, sort) {
   }
 
   btnShowMoreMovements.classList.remove('hidden');
-  const remaining = total - shown;
   btnShowMoreMovements.textContent = movementsExpanded
-    ? t('showLess', locale)
-    : remaining > 1
-      ? t('showMoreOps', locale, { n: remaining })
-      : t('showMoreOne', locale);
+    ? 'Montrer moins'
+    : total - shown > 1
+      ? `Montrer plus (${total - shown} opérations)`
+      : 'Montrer plus (1 opération)';
 }
 
 function renderStatementFooter(account) {
@@ -1025,7 +1264,7 @@ function renderStatementFooter(account) {
 function calcDisplayBalance(account) {
   const balance = getAccountBalance(account);
   account.balance = balance;
-  const formatted = maskAmount(balance, account);
+  const formatted = formatCurrency(balance, account.locale, account.currency);
   labelBalance.textContent = formatted;
   if (labelBalanceHero) labelBalanceHero.textContent = formatted;
 }
@@ -1039,48 +1278,49 @@ function calcDisplaySummary(account) {
     .filter(int => int >= 1)
     .reduce((sum, int) => sum + int, 0);
 
-  labelIncome.textContent = maskAmount(incomes, account);
-  labelOutcome.textContent = maskAmount(Math.abs(outcomes), account);
-  labelInterest.textContent = maskAmount(interest, account);
+  labelIncome.textContent = formatCurrency(incomes, account.locale, account.currency);
+  labelOutcome.textContent = formatCurrency(Math.abs(outcomes), account.locale, account.currency);
+  labelInterest.textContent = formatCurrency(interest, account.locale, account.currency);
+}
+
+function getClientFirstName(owner) {
+  const trimmed = (owner || '').trim();
+  if (!trimmed) return 'Client';
+  return trimmed.split(/\s+/)[0];
+}
+
+function updateClientDisplay(account) {
+  if (!account) return;
+  const fullName = account.owner.trim();
+  if (labelWelcome) {
+    labelWelcome.textContent = fullName ? `Bienvenue, ${fullName}` : 'Bienvenue';
+  }
+  if (sidebarClientGreeting) {
+    sidebarClientGreeting.textContent = getClientFirstName(account.owner);
+  }
+}
+
+function resetClientDisplay() {
+  if (sidebarClientGreeting) sidebarClientGreeting.textContent = 'Espace client';
 }
 
 function updateUI(account) {
   if (!account) return;
-  ensureAccountSettings(account);
+  updateClientDisplay(account);
   ensureStatementCoherent(account);
-  setWelcomeMessage(account.owner, account.locale);
   displayMovements(account, sorted, filter, movementSearch);
   calcDisplayBalance(account);
   calcDisplaySummary(account);
-  applyDisplayPreferences(account);
   account.statementBalance = roundAmount(getAccountBalance(account));
   updateChartVisibility();
 }
 
-function applyDisplayPreferences(account) {
-  if (balanceHeroCard) {
-    const hideHero = account.preferences?.hideBalanceHero && isMobileView();
-    balanceHeroCard.classList.toggle('hidden', hideHero);
-  }
-  if (containerMovements) {
-    containerMovements.classList.toggle('movements--compact', !!account.preferences?.compactMovements);
-  }
-}
-
-function maskAmount(value, account) {
-  if (account?.preferences?.maskBalances) return '••••••';
-  return formatCurrency(value, account.locale, account.currency);
-}
-
 function updateChartVisibility() {
   if (!chartSection || !btnToggleChart) return;
-  const locale = currentAccount?.locale || guestLocale;
   const mobile = isMobileView();
   chartSection.classList.toggle('chart-section--collapsed', mobile && !chartExpanded);
   btnToggleChart.classList.toggle('hidden', !mobile);
-  btnToggleChart.textContent = chartExpanded
-    ? t('hideChart', locale)
-    : t('showChart', locale);
+  btnToggleChart.textContent = chartExpanded ? 'Masquer le graphique' : 'Afficher le graphique';
 }
 
 function renderSpendingChart(account) {
@@ -1088,6 +1328,7 @@ function renderSpendingChart(account) {
 
   const chartData = account.movements
     .map((mov, i) => ({
+      value: mov,
       amount: Math.abs(mov),
       type: mov > 0 ? 'deposit' : 'withdrawal',
       label: new Date(account.movementDates[i]).toLocaleDateString(account.locale, {
@@ -1102,22 +1343,82 @@ function renderSpendingChart(account) {
     return;
   }
 
-  const maxValue = Math.max(...chartData.map(item => item.amount));
+  const values = chartData.map(d => d.value);
+  const chartMin = Math.min(0, ...values);
+  const chartMax = Math.max(0, ...values);
+  const span = chartMax - chartMin || 1;
 
-  spendingChart.innerHTML = chartData
+  const vbW = 400;
+  const vbH = 140;
+  const pad = { top: 18, right: 20, bottom: 28, left: 44 };
+  const plotW = vbW - pad.left - pad.right;
+  const plotH = vbH - pad.top - pad.bottom;
+
+  const toX = i =>
+    pad.left + (chartData.length === 1 ? plotW / 2 : (i / (chartData.length - 1)) * plotW);
+  const toY = v => pad.top + plotH * (1 - (v - chartMin) / span);
+
+  const points = chartData.map((d, i) => ({
+    x: toX(i),
+    y: toY(d.value),
+    ...d,
+  }));
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const areaPath =
+    linePath +
+    ` L ${points[points.length - 1].x.toFixed(1)} ${(pad.top + plotH).toFixed(1)}` +
+    ` L ${points[0].x.toFixed(1)} ${(pad.top + plotH).toFixed(1)} Z`;
+
+  const zeroInRange = chartMin <= 0 && chartMax >= 0;
+  const zeroY = toY(0);
+
+  const dots = points
     .map(
-      item => `
-        <div class="spending-bar">
-          <div class="spending-bar__fill" style="height: ${item.amount > 0 ? (item.amount / maxValue) * 100 : 5}%; background: ${
-            item.type === 'deposit'
-              ? 'linear-gradient(180deg, #37b24d, #2f9e44)'
-              : 'linear-gradient(180deg, #fa5252, #c92a2a)'
-          };"></div>
-          <div class="spending-bar__value">${formatCurrency(item.amount, account.locale, account.currency)}</div>
-          <div class="spending-bar__label">${item.label}</div>
-        </div>`
+      p => `
+      <circle
+        class="spending-line-chart__dot spending-line-chart__dot--${p.type}"
+        cx="${p.x.toFixed(1)}"
+        cy="${p.y.toFixed(1)}"
+        r="5"
+      >
+        <title>${p.label} — ${formatCurrency(p.amount, account.locale, account.currency)} (${p.type === 'deposit' ? 'entrée' : 'sortie'})</title>
+      </circle>`
     )
     .join('');
+
+  const foot = points
+    .map(
+      p => `
+      <div class="spending-line-chart__col">
+        <span class="spending-line-chart__value spending-line-chart__value--${p.type}">${formatCurrency(p.amount, account.locale, account.currency)}</span>
+        <span class="spending-line-chart__label">${p.label}</span>
+      </div>`
+    )
+    .join('');
+
+  spendingChart.innerHTML = `
+    <div class="spending-line-chart">
+      <svg
+        class="spending-line-chart__svg"
+        viewBox="0 0 ${vbW} ${vbH}"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Évolution des six dernières opérations"
+      >
+        <defs>
+          <linearGradient id="spendingLineFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1565c0" stop-opacity="0.22" />
+            <stop offset="100%" stop-color="#1565c0" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        ${zeroInRange ? `<line class="spending-line-chart__zero" x1="${pad.left}" y1="${zeroY.toFixed(1)}" x2="${vbW - pad.right}" y2="${zeroY.toFixed(1)}" />` : ''}
+        <path class="spending-line-chart__area" d="${areaPath}" />
+        <path class="spending-line-chart__line" d="${linePath}" />
+        ${dots}
+      </svg>
+      <div class="spending-line-chart__foot">${foot}</div>
+    </div>`;
 }
 
 const viewsMap = {
@@ -1138,8 +1439,91 @@ let pendingView = null;
 
 const normalizeView = view => {
   const v = (view || 'dashboard').trim();
+  for (const key of NAV_VIEWS_WITH_PANELS) {
+    if (v.startsWith(`${key}-`)) return key;
+  }
   return v === 'investment' ? 'investments' : v;
 };
+
+function setSidebarNavGroupOpen(view, open) {
+  const group = document.querySelector(`[data-nav-group="${view}"]`);
+  const submenu = document.getElementById(`sidebarSubmenu-${view}`);
+  const toggle = document.querySelector(`[data-nav-toggle="${view}"]`);
+  if (!group || !submenu) return;
+  group.classList.toggle('is-open', open);
+  submenu.classList.toggle('hidden', !open);
+  if (toggle) {
+    toggle.classList.toggle('is-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+}
+
+function closeAllSidebarNavGroups(exceptView = null) {
+  NAV_VIEWS_WITH_PANELS.forEach(view => {
+    if (view !== exceptView) setSidebarNavGroupOpen(view, false);
+  });
+}
+
+function setHeaderSettingsMenuOpen(open) {
+  if (!headerSettingsWrap || !headerSettingsMenu) return;
+  headerSettingsWrap.classList.toggle('is-open', open);
+  headerSettingsMenu.classList.toggle('hidden', !open);
+  if (btnSettings) {
+    btnSettings.classList.toggle('is-open', open);
+    btnSettings.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+}
+
+function updateAllNavLabels() {
+  const lang = getNavLang();
+  const ui = NAV_UI[lang] || NAV_UI.fr;
+  NAV_VIEWS_WITH_PANELS.forEach(view => {
+    const sectionUi = ui[view];
+    if (!sectionUi) return;
+    document.querySelectorAll(`[data-nav-label="${view}"]`).forEach(el => {
+      el.textContent = sectionUi.nav;
+    });
+    document.querySelectorAll(`.sidebar-sublink[data-nav-view="${view}"]`).forEach(btn => {
+      const panel = btn.dataset.navPanel;
+      const panelUi = sectionUi.panels[panel];
+      if (panelUi) btn.textContent = panelUi.title;
+    });
+  });
+  const menuSettingsLabel = document.querySelector('[data-i18n-nav="settings"]');
+  if (menuSettingsLabel && ui.settings) menuSettingsLabel.textContent = ui.settings.nav;
+  document.querySelectorAll('.header-settings-sublink').forEach(btn => {
+    const panel = btn.dataset.navPanel;
+    const panelUi = ui.settings?.panels[panel];
+    if (panelUi) btn.textContent = panelUi.title;
+  });
+}
+
+function updateNavPageHeader(view, panelKey) {
+  const section = NAV_SECTIONS[view];
+  const lang = getNavLang();
+  const ui = NAV_UI[lang]?.[view] || NAV_UI.fr[view];
+  if (!section || !ui) return;
+  const panel = ui.panels[panelKey] || ui.panels[section.defaultPanel];
+  const titleEl = document.getElementById(section.titleId);
+  const descEl = document.getElementById(section.descId);
+  if (titleEl) titleEl.textContent = panel.title;
+  if (descEl) descEl.textContent = panel.desc;
+}
+
+function activateNavPanel(view, panelKey) {
+  const section = NAV_SECTIONS[view];
+  if (!section) return;
+  if (!section.panels.includes(panelKey)) panelKey = section.defaultPanel;
+  activeNavPanels[view] = panelKey;
+  const panelId = `${section.prefix}${panelKey.charAt(0).toUpperCase()}${panelKey.slice(1)}`;
+  document.querySelectorAll(section.panelSelector).forEach(panel => {
+    panel.classList.toggle('active', panel.id === panelId);
+  });
+  document.querySelectorAll(`.sidebar-sublink[data-nav-view="${view}"]`).forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.navPanel === panelKey);
+  });
+  updateNavPageHeader(view, panelKey);
+}
 
 const isClientAuthenticated = () => !!currentAccount && !isAdminSession;
 
@@ -1158,7 +1542,7 @@ function showLoginPrompt(view) {
   loginForm.classList.remove('hidden');
   signupForm.classList.add('hidden');
   loginTab.classList.add('active');
-  signupTab.classList.remove('active');
+  if (signupTab) signupTab.classList.remove('active');
 
   try {
     history.replaceState(null, '', `#${normalized}`);
@@ -1177,7 +1561,7 @@ function hideAllViews() {
   });
 }
 
-function showView(view) {
+function showView(view, options = {}) {
   const normalized = normalizeView(view);
 
   if (isAdminSession) return;
@@ -1191,33 +1575,42 @@ function showView(view) {
   const selectors = viewsMap[normalized] || viewsMap.dashboard;
   selectors.forEach(sel => document.querySelectorAll(sel).forEach(el => el.classList.remove('hidden')));
 
-  if (normalized === 'services' && currentAccount) displayServices();
-  if (normalized === 'settings' && currentAccount) displaySettings();
-  if (normalized === 'accounts' && currentAccount) displayAccounts(currentAccount);
-  if (normalized === 'investments' && currentAccount) displayInvestments(currentAccount);
-  if (normalized === 'support' && currentAccount) displaySupportPage(currentAccount);
+  if (NAV_SECTIONS[normalized] && currentAccount) {
+    const panel = options.navPanel || getNavPanelFromHash(normalized);
+    displayNavSection(normalized, panel);
+    closeAllSidebarNavGroups(normalized);
+    setSidebarNavGroupOpen(normalized, true);
+  } else {
+    closeAllSidebarNavGroups();
+    setHeaderSettingsMenuOpen(false);
+  }
   if (normalized === 'dashboard' && currentAccount) updateUI(currentAccount);
 
   try {
-    history.replaceState(null, '', `#${normalized}`);
+    if (NAV_SECTIONS[normalized]) {
+      const panel = options.navPanel || getNavPanelFromHash(normalized);
+      history.replaceState(null, '', `#${normalized}-${panel}`);
+    } else {
+      history.replaceState(null, '', `#${normalized}`);
+    }
   } catch {
     /* ignore */
   }
-  closeSidebar();
+  if (!options.keepSidebar) closeSidebar();
 }
 
 function fillAdminEditForm(username) {
   const account = accounts.find(acc => acc.username === username);
   if (!account) {
     adminEditName.value = '';
-    adminEditPin.value = '';
+    if (adminEditPin) adminEditPin.value = '';
     adminEditBalance.value = '';
     adminCurrentBalance.textContent = 'Solde actuel : —';
     return;
   }
   const balance = getAccountBalance(account);
   adminEditName.value = account.owner;
-  adminEditPin.value = '';
+  if (adminEditPin) adminEditPin.value = '';
   adminEditBalance.value = balance.toFixed(2);
   adminCurrentBalance.textContent = `Solde actuel : ${formatCurrency(balance, account.locale, account.currency)}`;
 }
@@ -1255,10 +1648,10 @@ function showAdminPanel() {
   containerLogin.classList.add('hidden');
   containerDashboard.classList.add('hidden');
   containerAdmin.classList.remove('hidden');
-  labelWelcome.textContent = t('adminWelcome', getActiveLocale());
-  btnMenu.classList.add('hidden');
-  if (btnSettings) btnSettings.classList.add('hidden');
-  btnLogout.classList.remove('hidden');
+  labelWelcome.textContent = 'Espace administrateur';
+  btnMenu.classList.remove('hidden');
+  if (headerSettingsWrap) headerSettingsWrap.classList.add('hidden');
+  setHeaderSettingsMenuOpen(false);
   closeSidebar();
   renderAdminUserList();
   adminSelectUser.value = '';
@@ -1272,14 +1665,14 @@ function hideAdminPanel() {
 
 function showClientControls() {
   btnMenu.classList.remove('hidden');
-  if (btnSettings) btnSettings.classList.remove('hidden');
-  btnLogout.classList.remove('hidden');
+  if (headerSettingsWrap) headerSettingsWrap.classList.remove('hidden');
 }
 
 function hideClientControls() {
   btnMenu.classList.add('hidden');
-  if (btnSettings) btnSettings.classList.add('hidden');
-  btnLogout.classList.add('hidden');
+  if (headerSettingsWrap) headerSettingsWrap.classList.add('hidden');
+  setHeaderSettingsMenuOpen(false);
+  closeSidebar();
 }
 
 function tryAutoLogin() {
@@ -1298,21 +1691,22 @@ function tryAutoLogin() {
     hideAdminPanel();
     showClientControls();
     containerLogin.classList.add('hidden');
-    setWelcomeMessage(currentAccount.owner, currentAccount.locale);
+    updateClientDisplay(currentAccount);
     displayDate(currentAccount.locale);
-    applyAppLocale(currentAccount.locale);
     return true;
   }
   return false;
 }
 
 function logout() {
+  setHeaderSettingsMenuOpen(false);
   hideAllViews();
   containerDashboard.classList.add('hidden');
   hideAdminPanel();
   hideClientControls();
   containerLogin.classList.remove('hidden');
-  labelWelcome.textContent = t('guestWelcome', guestLocale);
+  labelWelcome.textContent = 'Connectez-vous pour accéder à votre compte';
+  resetClientDisplay();
   closeSidebar();
   clearSession();
   currentAccount = null;
@@ -1328,16 +1722,35 @@ function logout() {
   }
 }
 
+function setMenuToggleState(isOpen) {
+  if (!btnMenu) return;
+  btnMenu.classList.toggle('is-open', isOpen);
+  btnMenu.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  btnMenu.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
+}
+
 function openSidebar() {
   sidebar.classList.remove('hidden');
   sidebar.classList.add('open');
   sidebarOverlay.classList.remove('hidden');
+  document.body.classList.add('menu-open');
+  setMenuToggleState(true);
 }
 
 function closeSidebar() {
   sidebar.classList.remove('open');
   sidebarOverlay.classList.add('hidden');
   sidebar.classList.add('hidden');
+  document.body.classList.remove('menu-open');
+  setMenuToggleState(false);
+}
+
+function toggleSidebar() {
+  if (sidebar.classList.contains('open')) {
+    closeSidebar();
+  } else {
+    openSidebar();
+  }
 }
 
 function displayDate(locale = 'fr-FR') {
@@ -1348,56 +1761,57 @@ function displayDate(locale = 'fr-FR') {
   });
 }
 
-function activateServicePanel(panelKey) {
-  serviceTabs.forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.panel === panelKey);
-  });
-  const panelId = `service${panelKey.charAt(0).toUpperCase() + panelKey.slice(1)}`;
-  servicePanels.forEach(panel => {
-    panel.classList.toggle('active', panel.id === panelId);
-  });
-}
-
-function displayServices() {
+function displayNavSection(view, panelKey) {
   if (!currentAccount) return;
-  activateServicePanel('beneficiaries');
-  renderBeneficiaries(currentAccount);
+  const panel = panelKey || NAV_SECTIONS[view].defaultPanel;
+  activateNavPanel(view, panel);
+
+  if (view === 'services') updateServiceForms(currentAccount);
+  if (view === 'settings') updateSettingsForms(currentAccount);
+  if (view === 'accounts') {
+    renderAccountProducts(currentAccount);
+    renderSavings(currentAccount);
+  }
+  if (view === 'investments') renderInvestments(currentAccount);
+  if (view === 'support') renderTickets(currentAccount);
+
+  updateAllNavLabels();
 }
 
-function activateSettingsPanel(panelKey) {
-  activateTab(settingsTabs, settingsPanels, panelKey, 'settings');
+function displayServices(panelKey = 'profile') {
+  displayNavSection('services', panelKey);
 }
 
 function updateSettingsForms(account) {
   ensureAccountSettings(account);
-  settingsName.value = account.owner;
-  settingsEmail.value = account.username;
-  settingsNotifyEmail.checked = account.notifications.email;
-  settingsNotifySms.checked = account.notifications.sms;
-  settingsNotifyOperations.checked = account.notifications.operations;
-  settingsLocale.value = account.locale;
-  settingsCurrency.value = account.currency;
-  settingsHideBalanceHero.checked = account.preferences.hideBalanceHero;
-  settingsCompactMovements.checked = account.preferences.compactMovements;
-  settingsMaskBalances.checked = account.preferences.maskBalances;
+  if (settingsName) settingsName.value = account.owner;
+  if (settingsEmail) settingsEmail.value = account.username;
+  if (settingsNotifyEmail) settingsNotifyEmail.checked = account.notifications.email;
+  if (settingsNotifySms) settingsNotifySms.checked = account.notifications.sms;
+  if (settingsNotifyOperations) settingsNotifyOperations.checked = account.notifications.operations;
+  if (settingsLocale) settingsLocale.value = account.locale;
+  if (settingsCurrency) settingsCurrency.value = account.currency;
+  if (settingsHideBalanceHero) settingsHideBalanceHero.checked = account.preferences.hideBalanceHero;
+  if (settingsCompactMovements) settingsCompactMovements.checked = account.preferences.compactMovements;
+  if (settingsMaskBalances) settingsMaskBalances.checked = account.preferences.maskBalances;
   updateCountryHint(account.locale);
-  settingsCurrentPin.value = '';
-  settingsNewPin.value = '';
-  settingsConfirmPin.value = '';
+  if (settingsCurrentPin) settingsCurrentPin.value = '';
+  if (settingsNewPin) settingsNewPin.value = '';
+  if (settingsConfirmPin) settingsConfirmPin.value = '';
 
-  const balance = getAccountBalance(account);
-  settingsAccountInfo.innerHTML = `
-    <li><strong>Nom</strong><span>${account.owner}</span></li>
-    <li><strong>Email</strong><span>${account.username}</span></li>
-    <li><strong>Solde</strong><span>${formatCurrency(balance, account.locale, account.currency)}</span></li>
-    <li><strong>Produits actifs</strong><span>${account.accountProducts.length}</span></li>
-    <li><strong>Bénéficiaires</strong><span>${account.beneficiaries.length}</span></li>`;
+  if (settingsAccountInfo) {
+    const balance = getAccountBalance(account);
+    settingsAccountInfo.innerHTML = `
+      <li><strong>Nom</strong><span>${account.owner}</span></li>
+      <li><strong>Email</strong><span>${account.username}</span></li>
+      <li><strong>Solde</strong><span>${formatCurrency(balance, account.locale, account.currency)}</span></li>
+      <li><strong>Produits actifs</strong><span>${account.accountProducts.length}</span></li>
+      <li><strong>Bénéficiaires</strong><span>${account.beneficiaries.length}</span></li>`;
+  }
 }
 
-function displaySettings() {
-  if (!currentAccount) return;
-  activateSettingsPanel('profile');
-  updateSettingsForms(currentAccount);
+function displaySettings(panelKey = 'profile') {
+  displayNavSection('settings', panelKey);
 }
 
 function renderBeneficiaries(account) {
@@ -1422,17 +1836,11 @@ function renderBeneficiaries(account) {
 }
 
 function updateServiceForms(account) {
+  serviceName.value = account.owner;
+  servicePin.value = '';
+  notifyEmail.checked = account.notifications?.email ?? true;
+  notifySms.checked = account.notifications?.sms ?? false;
   renderBeneficiaries(account);
-}
-
-function activateTab(tabs, panels, panelKey, prefix) {
-  tabs.forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.panel === panelKey);
-  });
-  const panelId = `${prefix}${panelKey.charAt(0).toUpperCase() + panelKey.slice(1)}`;
-  panels.forEach(panel => {
-    panel.classList.toggle('active', panel.id === panelId);
-  });
 }
 
 function renderAccountProducts(account) {
@@ -1470,20 +1878,19 @@ function renderTickets(account) {
     : '<li class="empty-state">Aucun ticket en cours.</li>';
 }
 
-function displayAccounts(account) {
-  activateTab(accountTabs, accountPanels, 'summary', 'account');
-  renderAccountProducts(account);
-  renderSavings(account);
+function displayAccounts(account, panelKey = 'summary') {
+  if (account) currentAccount = account;
+  displayNavSection('accounts', panelKey);
 }
 
-function displayInvestments(account) {
-  activateTab(investmentTabs, investmentPanels, 'portfolio', 'investment');
-  renderInvestments(account);
+function displayInvestments(account, panelKey = 'portfolio') {
+  if (account) currentAccount = account;
+  displayNavSection('investments', panelKey);
 }
 
-function displaySupportPage(account) {
-  activateTab(supportTabs, supportPanels, 'faq', 'support');
-  renderTickets(account);
+function displaySupportPage(account, panelKey = 'faq') {
+  if (account) currentAccount = account;
+  displayNavSection('support', panelKey);
 }
 
 // --- Événements ---
@@ -1493,15 +1900,15 @@ loginTab.addEventListener('click', () => {
   loginForm.classList.remove('hidden');
   signupForm.classList.add('hidden');
   loginTab.classList.add('active');
-  signupTab.classList.remove('active');
+  if (signupTab) signupTab.classList.remove('active');
 });
 
-signupTab.addEventListener('click', () => {
-  loginForm.classList.add('hidden');
-  signupForm.classList.remove('hidden');
-  loginTab.classList.remove('active');
-  signupTab.classList.add('active');
-});
+if (signupTab) {
+  signupTab.addEventListener('click', () => {
+    showInfo('Les inscriptions en ligne sont fermées. Contactez votre agence Ecorise Banque.');
+    loginTab.click();
+  });
+}
 
 loginForm.addEventListener('submit', async e => {
   e.preventDefault();
@@ -1524,9 +1931,8 @@ loginForm.addEventListener('submit', async e => {
       hideAdminPanel();
       showClientControls();
       containerLogin.classList.add('hidden');
-      setWelcomeMessage(currentAccount.owner, currentAccount.locale);
+      updateClientDisplay(currentAccount);
       displayDate(currentAccount.locale);
-      applyAppLocale(currentAccount.locale);
       saveSession(username, pin, 'user');
       inputUsername.value = inputPin.value = '';
       showSuccess('Connexion réussie.');
@@ -1552,7 +1958,7 @@ adminEditForm.addEventListener('submit', async e => {
     }
 
     const newName = adminEditName.value.trim();
-    const newPin = adminEditPin.value.trim();
+    const newPin = adminEditPin?.value.trim() || '';
     const newBalance = Number(adminEditBalance.value);
 
     if (!newName) {
@@ -1571,7 +1977,7 @@ adminEditForm.addEventListener('submit', async e => {
     const previousBalance = getAccountBalance(account);
     account.owner = newName;
     if (newPin) account.pin = newPin;
-    adminEditPin.value = '';
+    if (adminEditPin) adminEditPin.value = '';
     const { changed } = syncStatementToBalance(account, newBalance);
     account.statementBalance = roundAmount(getAccountBalance(account));
     await persistAccounts();
@@ -1580,10 +1986,7 @@ adminEditForm.addEventListener('submit', async e => {
     adminSelectUser.value = username;
     fillAdminEditForm(username);
 
-    if (currentAccount?.username === username) {
-      setWelcomeMessage(currentAccount.owner);
-      updateUI(currentAccount);
-    }
+    if (currentAccount?.username === username) updateUI(currentAccount);
 
     const finalBalance = getAccountBalance(account);
     const pinMsg = newPin ? ' — mot de passe mis à jour' : '';
@@ -1595,11 +1998,18 @@ adminEditForm.addEventListener('submit', async e => {
             ? ' (régularisation sortie ajoutée)'
             : '')
     );
+
+    if (currentAccount?.username === username && newPin) {
+      saveSession(username, newPin, 'user');
+    }
   }, 'Mise à jour du compte…');
 });
 
 signupForm.addEventListener('submit', e => {
   e.preventDefault();
+  showError('Les inscriptions en ligne sont fermées. Contactez votre agence Ecorise Banque.');
+  if (!SIGNUP_ENABLED) return;
+
   const owner = signupName.value.trim();
   const username = signupUsername.value.trim().toLowerCase();
   const pin = signupPin.value.trim();
@@ -1626,39 +2036,158 @@ signupForm.addEventListener('submit', e => {
   loginTab.click();
 });
 
-btnLogout.addEventListener('click', logout);
-btnMenu.addEventListener('click', openSidebar);
+if (btnLogout) btnLogout.addEventListener('click', logout);
+btnMenu.addEventListener('click', toggleSidebar);
 if (btnSettings) {
-  btnSettings.addEventListener('click', () => showView('settings'));
+  btnSettings.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = headerSettingsMenu && !headerSettingsMenu.classList.contains('hidden');
+    setHeaderSettingsMenuOpen(!isOpen);
+  });
 }
-btnCloseSidebar.addEventListener('click', closeSidebar);
 sidebarOverlay.addEventListener('click', closeSidebar);
+
+document.querySelectorAll('[data-nav-toggle]').forEach(toggle => {
+  toggle.addEventListener('click', e => {
+    e.stopPropagation();
+    const view = toggle.dataset.navToggle;
+    const submenu = document.getElementById(`sidebarSubmenu-${view}`);
+    const isOpen = submenu && !submenu.classList.contains('hidden');
+    if (isOpen) {
+      setSidebarNavGroupOpen(view, false);
+    } else {
+      closeAllSidebarNavGroups(view);
+      setSidebarNavGroupOpen(view, true);
+    }
+  });
+});
+
+function bindNavSublink(btn, options = {}) {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const view = btn.dataset.navView;
+    const panel = btn.dataset.navPanel;
+    if (!view || !panel) return;
+    if (view === 'settings') setHeaderSettingsMenuOpen(false);
+    showView(view, {
+      navPanel: panel,
+      keepSidebar: options.keepSidebar ?? false,
+    });
+  });
+}
+
+document.querySelectorAll('.sidebar-sublink[data-nav-view]').forEach(btn => {
+  bindNavSublink(btn, { keepSidebar: true });
+});
+
+document.querySelectorAll('.header-settings-sublink').forEach(btn => {
+  bindNavSublink(btn);
+});
+
+document.addEventListener('click', e => {
+  if (!headerSettingsWrap || headerSettingsMenu?.classList.contains('hidden')) return;
+  if (headerSettingsWrap.contains(e.target)) return;
+  setHeaderSettingsMenuOpen(false);
+});
+
+document.querySelectorAll('[data-open-settings]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    showView('settings', { navPanel: btn.dataset.openSettings || 'profile' });
+  });
+});
+
+if (settingsProfileForm) {
+  settingsProfileForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentAccount) return;
+    const name = settingsName.value.trim();
+    if (!name) {
+      showError('Le nom complet est requis.');
+      return;
+    }
+    currentAccount.owner = name;
+    await persistAccounts();
+    updateClientDisplay(currentAccount);
+    updateSettingsForms(currentAccount);
+    updateUI(currentAccount);
+    showSuccess('Profil mis à jour.');
+  });
+}
+
+if (settingsNotificationsForm) {
+  settingsNotificationsForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentAccount) return;
+    currentAccount.notifications = {
+      email: settingsNotifyEmail.checked,
+      sms: settingsNotifySms.checked,
+      operations: settingsNotifyOperations.checked,
+    };
+    await persistAccounts();
+    showSuccess('Notifications mises à jour.');
+  });
+}
+
+if (settingsPreferencesForm) {
+  settingsPreferencesForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentAccount) return;
+    const locale = settingsLocale.value;
+    if (!LOCALE_OPTIONS[locale]) return;
+    currentAccount.locale = locale;
+    currentAccount.currency = settingsCurrency.value || getLocaleCurrency(locale);
+    currentAccount.preferences.hideBalanceHero = settingsHideBalanceHero.checked;
+    currentAccount.preferences.compactMovements = settingsCompactMovements.checked;
+    await persistAccounts();
+    displayDate(currentAccount.locale);
+    updateSettingsForms(currentAccount);
+    updateAllNavLabels();
+    updateNavPageHeader('settings', activeNavPanels.settings);
+    updateUI(currentAccount);
+    showSuccess('Préférences enregistrées.');
+  });
+}
+
+if (settingsLocale) {
+  settingsLocale.addEventListener('change', () => {
+    if (!currentAccount) return;
+    settingsCurrency.value = getLocaleCurrency(settingsLocale.value);
+    updateCountryHint(settingsLocale.value);
+  });
+}
+
+if (settingsSecurityForm) {
+  settingsSecurityForm.addEventListener('submit', e => {
+    e.preventDefault();
+    if (!currentAccount) return;
+    const currentPin = settingsCurrentPin.value;
+    const newPin = settingsNewPin.value.trim();
+    const confirmPin = settingsConfirmPin.value.trim();
+    if (currentPin || newPin || confirmPin) {
+      settingsCurrentPin.value = settingsNewPin.value = settingsConfirmPin.value = '';
+      showError(
+        'Impossible de modifier votre mot de passe. Cette opération est réservée à l’administration de la banque. Contactez votre conseiller Ecorise Banque.'
+      );
+    }
+  });
+}
+
+if (settingsPrivacyForm) {
+  settingsPrivacyForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!currentAccount) return;
+    currentAccount.preferences.maskBalances = settingsMaskBalances.checked;
+    await persistAccounts();
+    updateUI(currentAccount);
+    showSuccess('Paramètres de confidentialité enregistrés.');
+  });
+}
 
 adminSelectUser.addEventListener('change', function () {
   adminUserList.querySelectorAll('li').forEach(li => {
     li.classList.toggle('selected', li.dataset.username === this.value);
   });
   fillAdminEditForm(this.value);
-});
-
-serviceTabs.forEach(tab => {
-  tab.addEventListener('click', () => activateServicePanel(tab.dataset.panel));
-});
-
-settingsTabs.forEach(tab => {
-  tab.addEventListener('click', () => activateSettingsPanel(tab.dataset.panel));
-});
-
-accountTabs.forEach(tab => {
-  tab.addEventListener('click', () => activateTab(accountTabs, accountPanels, tab.dataset.panel, 'account'));
-});
-
-investmentTabs.forEach(tab => {
-  tab.addEventListener('click', () => activateTab(investmentTabs, investmentPanels, tab.dataset.panel, 'investment'));
-});
-
-supportTabs.forEach(tab => {
-  tab.addEventListener('click', () => activateTab(supportTabs, supportPanels, tab.dataset.panel, 'support'));
 });
 
 newProductForm.addEventListener('submit', e => {
@@ -1725,99 +2254,42 @@ ticketForm.addEventListener('submit', e => {
   showSuccess('Ticket de support envoyé.');
 });
 
-settingsProfileForm.addEventListener('submit', async e => {
+profileForm.addEventListener('submit', e => {
   e.preventDefault();
   if (!currentAccount) return;
-  const name = settingsName.value.trim();
+  const name = serviceName.value.trim();
+  const pin = servicePin.value.trim();
   if (!name) {
-    showError('Le nom complet est requis.');
+    showError('Le nom est requis.');
     return;
   }
+
+  if (pin.length > 0) {
+    servicePin.value = '';
+    showError(
+      'Impossible de modifier votre mot de passe. Cette opération est réservée à l’administration de la banque. Contactez votre conseiller Ecorise Banque.'
+    );
+    if (name !== currentAccount.owner) {
+      currentAccount.owner = name;
+      persistAccounts();
+      updateUI(currentAccount);
+      showInfo('Votre nom a été mis à jour. Le mot de passe n’a pas été modifié.');
+    }
+    return;
+  }
+
   currentAccount.owner = name;
-  await persistAccounts();
-  setWelcomeMessage(currentAccount.owner);
-  updateSettingsForms(currentAccount);
-  updateUI(currentAccount);
+  persistAccounts();
   showSuccess('Profil mis à jour.');
-});
-
-settingsNotificationsForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!currentAccount) return;
-  currentAccount.notifications = {
-    email: settingsNotifyEmail.checked,
-    sms: settingsNotifySms.checked,
-    operations: settingsNotifyOperations.checked,
-  };
-  await persistAccounts();
-  showSuccess('Notifications mises à jour.');
-});
-
-settingsPreferencesForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!currentAccount) return;
-  currentAccount.preferences.hideBalanceHero = settingsHideBalanceHero.checked;
-  currentAccount.preferences.compactMovements = settingsCompactMovements.checked;
-  await applyLocalePreferenceChange({ persist: true, notify: false });
   updateUI(currentAccount);
-  showSuccess(t('localeUpdated', currentAccount.locale));
 });
 
-if (settingsLocale) {
-  settingsLocale.addEventListener('change', () => {
-    if (!currentAccount) return;
-    settingsCurrency.value = getLocaleCurrency(settingsLocale.value);
-    applyLocalePreferenceChange({ persist: true, notify: true });
-  });
-}
-
-if (settingsCurrency) {
-  settingsCurrency.addEventListener('change', async () => {
-    if (!currentAccount) return;
-    currentAccount.currency = settingsCurrency.value;
-    applyAppLocale(currentAccount.locale);
-    await persistAccounts();
-  });
-}
-
-settingsSecurityForm.addEventListener('submit', async e => {
+notificationsForm.addEventListener('submit', e => {
   e.preventDefault();
   if (!currentAccount) return;
-  const currentPin = settingsCurrentPin.value;
-  const newPin = settingsNewPin.value.trim();
-  const confirmPin = settingsConfirmPin.value.trim();
-
-  if (!currentPin) {
-    showError('Indiquez votre mot de passe actuel.');
-    return;
-  }
-  if (String(currentAccount.pin) !== String(currentPin)) {
-    showError('Mot de passe actuel incorrect.');
-    return;
-  }
-  if (newPin.length < 4) {
-    showError('Le nouveau mot de passe doit contenir au moins 4 caractères.');
-    return;
-  }
-  if (newPin !== confirmPin) {
-    showError('Les mots de passe ne correspondent pas.');
-    return;
-  }
-
-  currentAccount.pin = newPin;
-  await persistAccounts();
-  saveSession(currentAccount.username, newPin, 'user');
-  settingsCurrentPin.value = settingsNewPin.value = settingsConfirmPin.value = '';
-  showSuccess('Mot de passe modifié avec succès.');
-});
-
-settingsPrivacyForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!currentAccount) return;
-  currentAccount.preferences.maskBalances = settingsMaskBalances.checked;
-  await persistAccounts();
-  updateUI(currentAccount);
-  showSuccess('Paramètres de confidentialité enregistrés.');
+  currentAccount.notifications = { email: notifyEmail.checked, sms: notifySms.checked };
+  persistAccounts();
+  showSuccess('Préférences de notification mises à jour.');
 });
 
 addBeneficiaryForm.addEventListener('submit', e => {
@@ -1825,13 +2297,28 @@ addBeneficiaryForm.addEventListener('submit', e => {
   if (!currentAccount) return;
   const name = beneficiaryName.value.trim();
   const email = beneficiaryEmail.value.trim();
-  const accountNum = beneficiaryAccount.value.trim();
-  const bic = beneficiaryBic.value.trim();
-  if (!name || !email || !accountNum || !bic) {
+  const accountCheck = validateBankAccountField(beneficiaryAccount.value);
+  const bicCheck = validateBicField(beneficiaryBic.value);
+  if (!name || !email) {
     showError('Complétez tous les champs bénéficiaire.');
     return;
   }
-  currentAccount.beneficiaries.push({ name, email, account: accountNum, bic });
+  if (!accountCheck.ok) {
+    beneficiaryAccount.value = accountCheck.value;
+    showError(accountCheck.message);
+    return;
+  }
+  if (!bicCheck.ok) {
+    beneficiaryBic.value = bicCheck.value;
+    showError(bicCheck.message);
+    return;
+  }
+  currentAccount.beneficiaries.push({
+    name,
+    email,
+    account: accountCheck.value,
+    bic: bicCheck.value,
+  });
   beneficiaryName.value = beneficiaryEmail.value = beneficiaryAccount.value = beneficiaryBic.value = '';
   persistAccounts();
   renderBeneficiaries(currentAccount);
@@ -1862,9 +2349,39 @@ supportForm.addEventListener('submit', e => {
 transferForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!currentAccount) return;
+
+  const accountInput = document.getElementById('transferAccountNumber');
+  const bicInput = document.getElementById('transferBic');
+  const accountCheck = validateBankAccountField(accountInput?.value);
+  const bicCheck = validateBicField(bicInput?.value);
+
+  if (!accountCheck.ok) {
+    if (accountInput) accountInput.value = accountCheck.value;
+    showError(accountCheck.message);
+    return;
+  }
+  if (!bicCheck.ok) {
+    if (bicInput) bicInput.value = bicCheck.value;
+    showError(bicCheck.message);
+    return;
+  }
+  if (accountInput) accountInput.value = accountCheck.value;
+  if (bicInput) bicInput.value = bicCheck.value;
+
   await withLoader(async () => {
-    showError('Virement impossible. Veuillez contacter le service bancaire.');
+    openTransferBlockedModal();
   }, 'Traitement du virement…');
+});
+
+transferBlockedClose?.addEventListener('click', closeTransferBlockedModal);
+transferBlockedOk?.addEventListener('click', closeTransferBlockedModal);
+transferBlockedContact?.addEventListener('click', openTransferSupportContact);
+transferBlockedOverlay?.addEventListener('click', closeTransferBlockedModal);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && transferBlockedModal && !transferBlockedModal.classList.contains('hidden')) {
+    closeTransferBlockedModal();
+  }
 });
 
 loanForm.addEventListener('submit', e => {
@@ -1920,28 +2437,38 @@ if (btnToggleChart) {
   });
 }
 
-document.querySelectorAll('.menu-card, .sidebar-link').forEach(link => {
+document.querySelectorAll('.menu-card[href], .sidebar-link[href]').forEach(link => {
   link.addEventListener('click', function (e) {
     e.preventDefault();
-    const view = this.dataset.view || (this.getAttribute('href') || '').replace('#', '').trim();
+    const view = (this.getAttribute('href') || '').replace('#', '').trim();
     const map = {
       transfer: 'transfer',
       loan: 'loan',
       cards: 'cards',
       services: 'services',
-      settings: 'settings',
       accounts: 'accounts',
       investments: 'investments',
       investment: 'investments',
       support: 'support',
       dashboard: 'dashboard',
     };
+    for (const navView of NAV_VIEWS_WITH_PANELS) {
+      if (view.startsWith(`${navView}-`)) {
+        const panel = view.replace(`${navView}-`, '');
+        showView(navView, {
+          navPanel: NAV_SECTIONS[navView].panels.includes(panel) ? panel : NAV_SECTIONS[navView].defaultPanel,
+          keepSidebar: true,
+        });
+        return;
+      }
+    }
     showView(map[view] || view || 'dashboard');
   });
 });
 
 // --- Init ---
 async function initApp() {
+  bindBankingInputs();
   populateLocaleOptions();
   populateCurrencyOptions();
   await syncAccountsFromServer();
@@ -1949,28 +2476,50 @@ async function initApp() {
   tryAutoLogin();
   rebindCurrentAccount();
 
-  if (currentAccount) {
-    applyAppLocale(currentAccount.locale);
-  } else {
-    applyAppLocale(guestLocale);
-  }
-
-  const initialHash = normalizeView((location.hash || '').replace('#', '').trim() || 'dashboard');
+  const rawHash = (location.hash || '').replace('#', '').trim() || 'dashboard';
   if (isAdminSession) {
     hideAllViews();
     renderAdminUserList();
   } else {
-    showView(initialHash);
+    let matched = false;
+    for (const navView of NAV_VIEWS_WITH_PANELS) {
+      if (rawHash.startsWith(`${navView}-`)) {
+        const panel = rawHash.replace(`${navView}-`, '');
+        showView(navView, {
+          navPanel: NAV_SECTIONS[navView].panels.includes(panel)
+            ? panel
+            : NAV_SECTIONS[navView].defaultPanel,
+        });
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      showView(normalizeView(rawHash));
+    }
   }
 
+  updateAllNavLabels();
   updateChartVisibility();
 }
 
 initApp();
 
 window.addEventListener('hashchange', () => {
-  const v = normalizeView((location.hash || '').replace('#', '').trim() || 'dashboard');
-  showView(v);
+  const raw = (location.hash || '').replace('#', '').trim() || 'dashboard';
+  for (const navView of NAV_VIEWS_WITH_PANELS) {
+    if (raw.startsWith(`${navView}-`)) {
+      const panel = raw.replace(`${navView}-`, '');
+      showView(navView, {
+        navPanel: NAV_SECTIONS[navView].panels.includes(panel)
+          ? panel
+          : NAV_SECTIONS[navView].defaultPanel,
+        keepSidebar: true,
+      });
+      return;
+    }
+  }
+  showView(normalizeView(raw));
 });
 
 let mobileLayout = isMobileView();
