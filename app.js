@@ -2088,7 +2088,7 @@ function bindNavSublink(btn, options = {}) {
 }
 
 document.querySelectorAll('.sidebar-sublink[data-nav-view]').forEach(btn => {
-  bindNavSublink(btn, { keepSidebar: true });
+  bindNavSublink(btn);
 });
 
 document.querySelectorAll('.header-settings-sublink').forEach(btn => {
