@@ -139,6 +139,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (pathname === '/api/geo' && req.method === 'GET') {
+    const raw =
+      req.headers['cf-ipcountry'] ||
+      req.headers['x-vercel-ip-country'] ||
+      req.headers['x-country-code'] ||
+      req.headers['cloudfront-viewer-country'] ||
+      null;
+    const code =
+      raw && String(raw).trim() && String(raw).toUpperCase() !== 'XX'
+        ? String(raw).trim().toUpperCase()
+        : null;
+    sendJson(res, 200, { country_code: code });
+    return;
+  }
+
   if (pathname === '/api/accounts' && req.method === 'GET') {
     try {
       const accounts = await loadAccounts();

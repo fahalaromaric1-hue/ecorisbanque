@@ -73,6 +73,22 @@ const I18N = {
     countryLabel: 'Pays',
     languageLabel: 'Langue / région',
     currencyLabel: 'Devise',
+    currentAccountBadge: 'Compte courant',
+    clientArea: 'Espace client',
+    navProfile: 'Profil',
+    navBeneficiaries: 'Bénéficiaires',
+    navSupportShort: 'Assistance',
+    navSavings: 'Épargne',
+    navActions: 'Actions',
+    navPortfolio: 'Portefeuille',
+    navInvest: 'Investir',
+    navStrategy: 'Stratégie',
+    navFaq: 'FAQ',
+    navTickets: 'Tickets',
+    navNotifications: 'Notifications',
+    navPreferences: 'Préférences',
+    navSecurity: 'Sécurité',
+    navAccount: 'Compte',
   },
   en: {
     appTitle: 'Ecorise Bank - Online banking',
@@ -133,6 +149,22 @@ const I18N = {
     countryLabel: 'Country',
     languageLabel: 'Language / region',
     currencyLabel: 'Currency',
+    currentAccountBadge: 'Current account',
+    clientArea: 'Client area',
+    navProfile: 'Profile',
+    navBeneficiaries: 'Beneficiaries',
+    navSupportShort: 'Support',
+    navSavings: 'Savings',
+    navActions: 'Actions',
+    navPortfolio: 'Portfolio',
+    navInvest: 'Invest',
+    navStrategy: 'Strategy',
+    navFaq: 'FAQ',
+    navTickets: 'Tickets',
+    navNotifications: 'Notifications',
+    navPreferences: 'Preferences',
+    navSecurity: 'Security',
+    navAccount: 'Account',
   },
   de: {
     appTitle: 'Ecorise Bank - Online-Banking',
@@ -193,6 +225,22 @@ const I18N = {
     countryLabel: 'Land',
     languageLabel: 'Sprache / Region',
     currencyLabel: 'Währung',
+    currentAccountBadge: 'Girokonto',
+    clientArea: 'Kundenbereich',
+    navProfile: 'Profil',
+    navBeneficiaries: 'Begünstigte',
+    navSupportShort: 'Support',
+    navSavings: 'Sparen',
+    navActions: 'Aktionen',
+    navPortfolio: 'Portfolio',
+    navInvest: 'Investieren',
+    navStrategy: 'Strategie',
+    navFaq: 'FAQ',
+    navTickets: 'Tickets',
+    navNotifications: 'Benachrichtigungen',
+    navPreferences: 'Einstellungen',
+    navSecurity: 'Sicherheit',
+    navAccount: 'Konto',
   },
   es: {
     appTitle: 'Ecorise Banco - Banca en línea',
@@ -253,6 +301,22 @@ const I18N = {
     countryLabel: 'País',
     languageLabel: 'Idioma / región',
     currencyLabel: 'Moneda',
+    currentAccountBadge: 'Cuenta corriente',
+    clientArea: 'Área de cliente',
+    navProfile: 'Perfil',
+    navBeneficiaries: 'Beneficiarios',
+    navSupportShort: 'Asistencia',
+    navSavings: 'Ahorro',
+    navActions: 'Acciones',
+    navPortfolio: 'Cartera',
+    navInvest: 'Invertir',
+    navStrategy: 'Estrategia',
+    navFaq: 'FAQ',
+    navTickets: 'Tickets',
+    navNotifications: 'Notificaciones',
+    navPreferences: 'Preferencias',
+    navSecurity: 'Seguridad',
+    navAccount: 'Cuenta',
   },
   it: {
     appTitle: 'Ecorise Banca - Banca online',
@@ -537,4 +601,358 @@ function getLocaleCurrency(locale) {
 
 function getLocaleDir(locale) {
   return LOCALE_CONFIG[locale]?.dir || 'ltr';
+}
+
+/** Pays du visiteur (code ISO) → locale régionale */
+const COUNTRY_TO_LOCALE = {
+  FR: 'fr-FR',
+  BE: 'fr-FR',
+  LU: 'fr-FR',
+  MC: 'fr-FR',
+  CH: 'fr-FR',
+  CA: 'fr-CA',
+  US: 'en-US',
+  GB: 'en-GB',
+  IE: 'en-GB',
+  AU: 'en-US',
+  NZ: 'en-US',
+  ZA: 'en-GB',
+  IN: 'en-GB',
+  SG: 'en-US',
+  PH: 'en-US',
+  DE: 'de-DE',
+  AT: 'de-DE',
+  ES: 'es-ES',
+  MX: 'es-MX',
+  AR: 'es-ES',
+  CO: 'es-ES',
+  CL: 'es-ES',
+  PE: 'es-ES',
+  IT: 'it-IT',
+  PT: 'pt-PT',
+  BR: 'pt-BR',
+  NL: 'nl-NL',
+  MA: 'ar-MA',
+  DZ: 'ar-MA',
+  TN: 'ar-MA',
+  EG: 'ar-MA',
+  SA: 'ar-MA',
+  AE: 'ar-MA',
+};
+
+const VISITOR_LOCALE_KEY = 'ecorisVisitorLocale';
+
+const UI_STATIC_BINDINGS = [
+  { sel: '#appLoaderText', key: 'loading' },
+  { sel: '#loginSection h2', key: 'login' },
+  { sel: '#loginForm label[for="inputUsername"]', key: 'email' },
+  { sel: '#loginForm label[for="inputPin"]', key: 'password' },
+  { sel: '#loginForm .btn--primary', key: 'connect' },
+  { sel: '#loginSection .login-note:not(.login-note--closed)', key: 'loginNote' },
+  { sel: '#btnLogout', key: 'logout' },
+  { sel: '#btnMenu', key: 'menu', attr: 'aria' },
+  { sel: '#btnSettings', key: 'settings', attr: 'aria' },
+  { sel: '.sidebar-nav > a[href="#dashboard"]', key: 'navDashboard' },
+  { sel: '.sidebar-nav > a[href="#transfer"]', key: 'navTransfer' },
+  { sel: '.sidebar-nav > a[href="#loan"]', key: 'navLoan' },
+  { sel: '.sidebar-nav > a[href="#cards"]', key: 'navCards' },
+  { sel: '[data-nav-label="services"]', key: 'navServices' },
+  { sel: '[data-nav-label="accounts"]', key: 'navAccounts' },
+  { sel: '[data-nav-label="investments"]', key: 'navInvestments' },
+  { sel: '[data-nav-label="support"]', key: 'navSupport' },
+  { sel: '[data-nav-label="settings"]', key: 'navSettings' },
+  { sel: '#balanceHeroCard .balance-hero__label', key: 'availableBalance' },
+  { sel: '#sidebarClientGreeting', key: 'clientArea' },
+  { sel: '#balanceHeroCard .balance-hero__badge', key: 'currentAccountBadge' },
+  { sel: '#dashboard .summary-card:nth-child(1) p', key: 'balance' },
+  { sel: '#dashboard .summary-card:nth-child(2) p', key: 'income' },
+  { sel: '#dashboard .summary-card:nth-child(3) p', key: 'expenses' },
+  { sel: '#dashboard .summary-card:nth-child(4) p', key: 'interest' },
+  { sel: '#dashboard .movements-card h3', key: 'movementsHistory' },
+  { sel: '#movementSearch', key: 'searchMovements', attr: 'placeholder' },
+  { sel: '#btnExportStatement', key: 'exportStatement' },
+  { sel: '#btnSort', key: 'sort' },
+  { sel: '.filter-buttons [data-filter="all"]', key: 'filterAll' },
+  { sel: '.filter-buttons [data-filter="deposit"]', key: 'filterDeposits' },
+  { sel: '.filter-buttons [data-filter="withdrawal"]', key: 'filterWithdrawals' },
+  { sel: '.menu-grid a[href="#dashboard"]', key: 'navMyAccounts' },
+  { sel: '.menu-grid a[href="#transfer"]', key: 'navTransfer' },
+  { sel: '.menu-grid a[href="#loan"]', key: 'navLoan' },
+  { sel: '.menu-grid a[href="#cards"]', key: 'navCards' },
+  { sel: '.menu-grid a[href="#services"]', key: 'navServices' },
+  { sel: '.menu-card--settings span', key: 'navSettings' },
+];
+
+function applyText(el, text, attr) {
+  if (!el || text == null) return;
+  if (attr === 'aria') {
+    el.setAttribute('aria-label', text);
+    return;
+  }
+  if (attr === 'placeholder') {
+    el.placeholder = text;
+    return;
+  }
+  if (el.tagName === 'INPUT' && (el.type === 'submit' || el.type === 'button')) {
+    el.value = text;
+    return;
+  }
+  el.textContent = text;
+}
+
+function applyPageI18n(locale = 'fr-FR') {
+  const safeLocale = LOCALE_CONFIG[locale] ? locale : detectBrowserLocale();
+  document.documentElement.lang = getLangFromLocale(safeLocale);
+  document.documentElement.dir = getLocaleDir(safeLocale);
+  document.title = t('appTitle', safeLocale);
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    applyText(el, t(el.dataset.i18n, safeLocale), el.dataset.i18nAttr);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    applyText(el, t(el.dataset.i18nPlaceholder, safeLocale), 'placeholder');
+  });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    applyText(el, t(el.dataset.i18nAria, safeLocale), 'aria');
+  });
+
+  UI_STATIC_BINDINGS.forEach(({ sel, key, attr }) => {
+    document.querySelectorAll(sel).forEach(el => applyText(el, t(key, safeLocale), attr));
+  });
+
+  return safeLocale;
+}
+
+function localeFromCountryCode(code) {
+  if (!code) return null;
+  const upper = String(code).trim().toUpperCase();
+  return COUNTRY_TO_LOCALE[upper] || null;
+}
+
+async function fetchCountryCode() {
+  try {
+    const res = await fetch('/api/geo', { cache: 'no-store', signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      const code = data.country_code || data.country || data.countryCode;
+      if (code) return String(code).toUpperCase();
+    }
+  } catch {
+    /* serveur local ou réseau indisponible */
+  }
+
+  try {
+    const res = await fetch('https://ipapi.co/country_code/', {
+      signal: AbortSignal.timeout(3500),
+    });
+    if (res.ok) {
+      const text = (await res.text()).trim().toUpperCase();
+      if (text.length === 2) return text;
+    }
+  } catch {
+    /* API externe optionnelle */
+  }
+
+  return null;
+}
+
+async function detectVisitorLocale() {
+  try {
+    const cached = sessionStorage.getItem(VISITOR_LOCALE_KEY);
+    if (cached && LOCALE_CONFIG[cached]) return cached;
+  } catch {
+    /* ignore */
+  }
+
+  const country = await fetchCountryCode();
+  const fromCountry = localeFromCountryCode(country);
+  const locale = fromCountry || detectBrowserLocale();
+
+  try {
+    sessionStorage.setItem(VISITOR_LOCALE_KEY, locale);
+  } catch {
+    /* ignore */
+  }
+
+  return locale;
+}
+
+/** Sous-titres des sections (panneaux) par langue */
+const NAV_PANELS_UI = {
+  fr: {
+    services: {
+      nav: 'Services',
+      panels: {
+        profile: { title: 'Profil', desc: 'Informations personnelles et notifications.' },
+        beneficiaries: { title: 'Bénéficiaires', desc: 'Gérez vos bénéficiaires de virement.' },
+        support: { title: 'Assistance', desc: 'Contactez le support par message.' },
+      },
+    },
+    settings: {
+      nav: 'Paramètres',
+      panels: {
+        profile: { title: 'Profil', desc: 'Modifiez vos informations personnelles.' },
+        notifications: { title: 'Notifications', desc: 'Gérez vos alertes email, SMS et opérations.' },
+        preferences: { title: 'Préférences', desc: 'Langue, devise et affichage.' },
+        security: { title: 'Sécurité', desc: 'Mot de passe et protection du compte.' },
+        account: { title: 'Compte', desc: 'Informations et confidentialité.' },
+      },
+    },
+    accounts: {
+      nav: 'Comptes',
+      panels: {
+        summary: { title: 'Mes comptes', desc: 'Consultez vos comptes actifs.' },
+        savings: { title: 'Épargne', desc: 'Produits d’épargne et soldes.' },
+        actions: { title: 'Actions', desc: 'Demander ou fermer un produit.' },
+      },
+    },
+    investments: {
+      nav: 'Investissements',
+      panels: {
+        portfolio: { title: 'Portefeuille', desc: 'Suivez vos investissements.' },
+        invest: { title: 'Investir', desc: 'Passez un nouvel ordre.' },
+        strategy: { title: 'Stratégie', desc: 'Conseils et bonnes pratiques.' },
+      },
+    },
+    support: {
+      nav: 'Assistance',
+      panels: {
+        faq: { title: 'FAQ', desc: 'Questions fréquentes.' },
+        tickets: { title: 'Tickets', desc: 'Vos demandes au support.' },
+      },
+    },
+  },
+  en: {
+    services: {
+      nav: 'Services',
+      panels: {
+        profile: { title: 'Profile', desc: 'Personal info and notifications.' },
+        beneficiaries: { title: 'Beneficiaries', desc: 'Manage transfer beneficiaries.' },
+        support: { title: 'Support', desc: 'Contact support by message.' },
+      },
+    },
+    settings: {
+      nav: 'Settings',
+      panels: {
+        profile: { title: 'Profile', desc: 'Update personal information.' },
+        notifications: { title: 'Notifications', desc: 'Email, SMS and alert settings.' },
+        preferences: { title: 'Preferences', desc: 'Language, currency and display.' },
+        security: { title: 'Security', desc: 'Password and account protection.' },
+        account: { title: 'Account', desc: 'Account info and privacy.' },
+      },
+    },
+    accounts: {
+      nav: 'Accounts',
+      panels: {
+        summary: { title: 'My accounts', desc: 'View active accounts.' },
+        savings: { title: 'Savings', desc: 'Savings products and balances.' },
+        actions: { title: 'Actions', desc: 'Request or close a product.' },
+      },
+    },
+    investments: {
+      nav: 'Investments',
+      panels: {
+        portfolio: { title: 'Portfolio', desc: 'Track your investments.' },
+        invest: { title: 'Invest', desc: 'Place a new order.' },
+        strategy: { title: 'Strategy', desc: 'Tips and best practices.' },
+      },
+    },
+    support: {
+      nav: 'Support',
+      panels: {
+        faq: { title: 'FAQ', desc: 'Frequently asked questions.' },
+        tickets: { title: 'Tickets', desc: 'Your support requests.' },
+      },
+    },
+  },
+  de: {
+    services: {
+      nav: 'Services',
+      panels: {
+        profile: { title: 'Profil', desc: 'Persönliche Daten und Benachrichtigungen.' },
+        beneficiaries: { title: 'Begünstigte', desc: 'Überweisungsbegünstigte verwalten.' },
+        support: { title: 'Support', desc: 'Support per Nachricht kontaktieren.' },
+      },
+    },
+    settings: {
+      nav: 'Einstellungen',
+      panels: {
+        profile: { title: 'Profil', desc: 'Persönliche Daten bearbeiten.' },
+        notifications: { title: 'Benachrichtigungen', desc: 'E-Mail-, SMS- und Transaktionsalerts.' },
+        preferences: { title: 'Einstellungen', desc: 'Sprache, Währung und Anzeige.' },
+        security: { title: 'Sicherheit', desc: 'Passwort und Kontoschutz.' },
+        account: { title: 'Konto', desc: 'Kontoinformationen und Datenschutz.' },
+      },
+    },
+    accounts: {
+      nav: 'Konten',
+      panels: {
+        summary: { title: 'Meine Konten', desc: 'Aktive Konten anzeigen.' },
+        savings: { title: 'Sparen', desc: 'Sparkonten und Salden.' },
+        actions: { title: 'Aktionen', desc: 'Produkt anfordern oder schließen.' },
+      },
+    },
+    investments: {
+      nav: 'Investitionen',
+      panels: {
+        portfolio: { title: 'Portfolio', desc: 'Investitionen verfolgen.' },
+        invest: { title: 'Investieren', desc: 'Neuen Auftrag platzieren.' },
+        strategy: { title: 'Strategie', desc: 'Tipps und Empfehlungen.' },
+      },
+    },
+    support: {
+      nav: 'Support',
+      panels: {
+        faq: { title: 'FAQ', desc: 'Häufige Fragen.' },
+        tickets: { title: 'Tickets', desc: 'Ihre Support-Anfragen.' },
+      },
+    },
+  },
+  es: {
+    services: {
+      nav: 'Servicios',
+      panels: {
+        profile: { title: 'Perfil', desc: 'Datos personales y notificaciones.' },
+        beneficiaries: { title: 'Beneficiarios', desc: 'Gestione sus beneficiarios.' },
+        support: { title: 'Asistencia', desc: 'Contacte con soporte.' },
+      },
+    },
+    settings: {
+      nav: 'Ajustes',
+      panels: {
+        profile: { title: 'Perfil', desc: 'Modifique sus datos personales.' },
+        notifications: { title: 'Notificaciones', desc: 'Alertas por email, SMS y operaciones.' },
+        preferences: { title: 'Preferencias', desc: 'Idioma, moneda y visualización.' },
+        security: { title: 'Seguridad', desc: 'Contraseña y protección de la cuenta.' },
+        account: { title: 'Cuenta', desc: 'Información y privacidad.' },
+      },
+    },
+    accounts: {
+      nav: 'Cuentas',
+      panels: {
+        summary: { title: 'Mis cuentas', desc: 'Consulte sus cuentas activas.' },
+        savings: { title: 'Ahorro', desc: 'Productos de ahorro y saldos.' },
+        actions: { title: 'Acciones', desc: 'Solicitar o cerrar un producto.' },
+      },
+    },
+    investments: {
+      nav: 'Inversiones',
+      panels: {
+        portfolio: { title: 'Cartera', desc: 'Siga sus inversiones.' },
+        invest: { title: 'Invertir', desc: 'Realice una nueva orden.' },
+        strategy: { title: 'Estrategia', desc: 'Consejos y buenas prácticas.' },
+      },
+    },
+    support: {
+      nav: 'Asistencia',
+      panels: {
+        faq: { title: 'FAQ', desc: 'Preguntas frecuentes.' },
+        tickets: { title: 'Tickets', desc: 'Sus solicitudes de soporte.' },
+      },
+    },
+  },
+};
+
+function getNavPanelsUi(lang) {
+  return NAV_PANELS_UI[lang] || NAV_PANELS_UI.en || NAV_PANELS_UI.fr;
 }

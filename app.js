@@ -576,21 +576,36 @@ const ensureStatementCoherent = account => {
   }
 };
 
-const LOCALE_OPTIONS = {
-  'fr-FR': { label: 'Français (France)', country: 'France', currency: 'EUR' },
-  'fr-CA': { label: 'Français (Canada)', country: 'Canada', currency: 'CAD' },
-  'en-GB': { label: 'English (UK)', country: 'United Kingdom', currency: 'GBP' },
-  'en-US': { label: 'English (US)', country: 'United States', currency: 'USD' },
-  'de-DE': { label: 'Deutsch', country: 'Deutschland', currency: 'EUR' },
-  'es-ES': { label: 'Español', country: 'España', currency: 'EUR' },
-};
+let visitorLocale = 'fr-FR';
 
-const CURRENCY_OPTIONS = [
-  { code: 'EUR', label: 'Euro (EUR)' },
-  { code: 'USD', label: 'Dollar US (USD)' },
-  { code: 'GBP', label: 'Livre sterling (GBP)' },
-  { code: 'CAD', label: 'Dollar canadien (CAD)' },
-];
+function getActiveLocale() {
+  return currentAccount?.locale || visitorLocale || 'fr-FR';
+}
+
+async function initUiLocale() {
+  visitorLocale = await detectVisitorLocale();
+  applyUiLocale(visitorLocale);
+}
+
+function applyUiLocale(locale = getActiveLocale()) {
+  const safe = applyPageI18n(locale);
+  if (labelWelcome) {
+    if (isAdminSession) {
+      labelWelcome.textContent = t('adminWelcome', safe);
+    } else if (!currentAccount) {
+      labelWelcome.textContent = t('guestWelcome', safe);
+    } else {
+      updateClientDisplay(currentAccount);
+    }
+  }
+  if (!currentAccount) resetClientDisplay();
+  NAV_VIEWS_WITH_PANELS.forEach(view => {
+    updateNavPageHeader(view, activeNavPanels[view]);
+  });
+  updateAllNavLabels();
+  updateChartVisibility();
+  return safe;
+}
 
 const NAV_SECTIONS = {
   services: {
@@ -637,95 +652,6 @@ const NAV_SECTIONS = {
 
 const NAV_VIEWS_WITH_PANELS = Object.keys(NAV_SECTIONS);
 
-const NAV_UI = {
-  fr: {
-    services: {
-      nav: 'Services',
-      panels: {
-        profile: { title: 'Profil', desc: 'Informations personnelles et notifications.' },
-        beneficiaries: { title: 'Bénéficiaires', desc: 'Gérez vos bénéficiaires de virement.' },
-        support: { title: 'Assistance', desc: 'Contactez le support par message.' },
-      },
-    },
-    settings: {
-      nav: 'Paramètres',
-      panels: {
-        profile: { title: 'Profil', desc: 'Modifiez vos informations personnelles.' },
-        notifications: { title: 'Notifications', desc: 'Gérez vos alertes email, SMS et opérations.' },
-        preferences: { title: 'Préférences', desc: 'Langue, devise et affichage.' },
-        security: { title: 'Sécurité', desc: 'Mot de passe et protection du compte.' },
-        account: { title: 'Compte', desc: 'Informations et confidentialité.' },
-      },
-    },
-    accounts: {
-      nav: 'Comptes',
-      panels: {
-        summary: { title: 'Mes comptes', desc: 'Consultez vos comptes actifs.' },
-        savings: { title: 'Épargne', desc: 'Produits d’épargne et soldes.' },
-        actions: { title: 'Actions', desc: 'Demander ou fermer un produit.' },
-      },
-    },
-    investments: {
-      nav: 'Investissements',
-      panels: {
-        portfolio: { title: 'Portefeuille', desc: 'Suivez vos investissements.' },
-        invest: { title: 'Investir', desc: 'Passez un nouvel ordre.' },
-        strategy: { title: 'Stratégie', desc: 'Conseils et bonnes pratiques.' },
-      },
-    },
-    support: {
-      nav: 'Assistance',
-      panels: {
-        faq: { title: 'FAQ', desc: 'Questions fréquentes.' },
-        tickets: { title: 'Tickets', desc: 'Vos demandes au support.' },
-      },
-    },
-  },
-  en: {
-    services: {
-      nav: 'Services',
-      panels: {
-        profile: { title: 'Profile', desc: 'Personal info and notifications.' },
-        beneficiaries: { title: 'Beneficiaries', desc: 'Manage transfer beneficiaries.' },
-        support: { title: 'Support', desc: 'Contact support by message.' },
-      },
-    },
-    settings: {
-      nav: 'Settings',
-      panels: {
-        profile: { title: 'Profile', desc: 'Update personal information.' },
-        notifications: { title: 'Notifications', desc: 'Email, SMS and alert settings.' },
-        preferences: { title: 'Preferences', desc: 'Language, currency and display.' },
-        security: { title: 'Security', desc: 'Password and account protection.' },
-        account: { title: 'Account', desc: 'Account info and privacy.' },
-      },
-    },
-    accounts: {
-      nav: 'Accounts',
-      panels: {
-        summary: { title: 'My accounts', desc: 'View active accounts.' },
-        savings: { title: 'Savings', desc: 'Savings products and balances.' },
-        actions: { title: 'Actions', desc: 'Request or close a product.' },
-      },
-    },
-    investments: {
-      nav: 'Investments',
-      panels: {
-        portfolio: { title: 'Portfolio', desc: 'Track your investments.' },
-        invest: { title: 'Invest', desc: 'Place a new order.' },
-        strategy: { title: 'Strategy', desc: 'Tips and best practices.' },
-      },
-    },
-    support: {
-      nav: 'Support',
-      panels: {
-        faq: { title: 'FAQ', desc: 'Frequently asked questions.' },
-        tickets: { title: 'Tickets', desc: 'Your support requests.' },
-      },
-    },
-  },
-};
-
 const activeNavPanels = {
   services: 'profile',
   settings: 'profile',
@@ -734,11 +660,8 @@ const activeNavPanels = {
   support: 'faq',
 };
 
-function getNavLang(locale = currentAccount?.locale || 'fr-FR') {
-  if (locale.startsWith('en')) return 'en';
-  if (locale.startsWith('de')) return 'de';
-  if (locale.startsWith('es')) return 'es';
-  return 'fr';
+function getNavLang(locale = getActiveLocale()) {
+  return getLangFromLocale(locale);
 }
 
 function getNavPanelFromHash(view) {
@@ -764,21 +687,17 @@ function ensureAccountSettings(account) {
       maskBalances: false,
     };
   }
-  if (!account.locale || !LOCALE_OPTIONS[account.locale]) {
-    account.locale = 'fr-FR';
+  if (!account.locale || !LOCALE_CONFIG[account.locale]) {
+    account.locale = visitorLocale || 'fr-FR';
   }
   if (!account.currency) {
-    account.currency = LOCALE_OPTIONS[account.locale].currency;
+    account.currency = getLocaleCurrency(account.locale);
   }
-}
-
-function getLocaleCurrency(locale) {
-  return LOCALE_OPTIONS[locale]?.currency || 'EUR';
 }
 
 function populateLocaleOptions() {
   if (!settingsLocale) return;
-  settingsLocale.innerHTML = Object.entries(LOCALE_OPTIONS)
+  settingsLocale.innerHTML = Object.entries(LOCALE_CONFIG)
     .map(([code, cfg]) => `<option value="${code}">${cfg.label} — ${cfg.country}</option>`)
     .join('');
 }
@@ -793,12 +712,13 @@ function populateCurrencyOptions() {
 function updateCountryHint(locale) {
   const hint = document.getElementById('settingsCountryHint');
   if (!hint) return;
-  const cfg = LOCALE_OPTIONS[locale];
+  const cfg = LOCALE_CONFIG[locale];
+  const uiLocale = getActiveLocale();
   if (!cfg) {
     hint.textContent = '';
     return;
   }
-  hint.textContent = `Pays : ${cfg.country} · Devise suggérée : ${getLocaleCurrency(locale)}`;
+  hint.textContent = `${t('countryLabel', uiLocale)} : ${cfg.country} · ${t('currencyLabel', uiLocale)} : ${getLocaleCurrency(locale)}`;
 }
 
 const createAccount = (owner, username, pin) => ({
@@ -808,8 +728,8 @@ const createAccount = (owner, username, pin) => ({
   movements: [0],
   movementDates: [],
   interestRate: 1.2,
-  locale: 'fr-FR',
-  currency: 'EUR',
+  locale: visitorLocale || 'fr-FR',
+  currency: getLocaleCurrency(visitorLocale || 'fr-FR'),
   notifications: { email: true, sms: false, operations: false },
   preferences: {
     hideBalanceHero: false,
@@ -1293,8 +1213,10 @@ function getClientFirstName(owner) {
 function updateClientDisplay(account) {
   if (!account) return;
   const fullName = account.owner.trim();
+  const loc = getActiveLocale();
   if (labelWelcome) {
-    labelWelcome.textContent = fullName ? `Bienvenue, ${fullName}` : 'Bienvenue';
+    const welcome = t('welcome', loc);
+    labelWelcome.textContent = fullName ? `${welcome}, ${fullName}` : welcome;
   }
   if (sidebarClientGreeting) {
     sidebarClientGreeting.textContent = getClientFirstName(account.owner);
@@ -1302,7 +1224,9 @@ function updateClientDisplay(account) {
 }
 
 function resetClientDisplay() {
-  if (sidebarClientGreeting) sidebarClientGreeting.textContent = 'Espace client';
+  if (sidebarClientGreeting) {
+    sidebarClientGreeting.textContent = t('clientArea', getActiveLocale());
+  }
 }
 
 function updateUI(account) {
@@ -1321,7 +1245,8 @@ function updateChartVisibility() {
   const mobile = isMobileView();
   chartSection.classList.toggle('chart-section--collapsed', mobile && !chartExpanded);
   btnToggleChart.classList.toggle('hidden', !mobile);
-  btnToggleChart.textContent = chartExpanded ? 'Masquer le graphique' : 'Afficher le graphique';
+  const loc = getActiveLocale();
+  btnToggleChart.textContent = chartExpanded ? t('hideChart', loc) : t('showChart', loc);
 }
 
 function renderSpendingChart(account) {
@@ -1477,7 +1402,7 @@ function setHeaderSettingsMenuOpen(open) {
 
 function updateAllNavLabels() {
   const lang = getNavLang();
-  const ui = NAV_UI[lang] || NAV_UI.fr;
+  const ui = getNavPanelsUi(lang);
   NAV_VIEWS_WITH_PANELS.forEach(view => {
     const sectionUi = ui[view];
     if (!sectionUi) return;
@@ -1502,7 +1427,8 @@ function updateAllNavLabels() {
 function updateNavPageHeader(view, panelKey) {
   const section = NAV_SECTIONS[view];
   const lang = getNavLang();
-  const ui = NAV_UI[lang]?.[view] || NAV_UI.fr[view];
+  const panelsUi = getNavPanelsUi(lang);
+  const ui = panelsUi[view] || getNavPanelsUi('fr')[view];
   if (!section || !ui) return;
   const panel = ui.panels[panelKey] || ui.panels[section.defaultPanel];
   const titleEl = document.getElementById(section.titleId);
@@ -1649,7 +1575,7 @@ function showAdminPanel() {
   containerLogin.classList.add('hidden');
   containerDashboard.classList.add('hidden');
   containerAdmin.classList.remove('hidden');
-  labelWelcome.textContent = 'Espace administrateur';
+  applyUiLocale(visitorLocale);
   btnMenu.classList.remove('hidden');
   if (headerSettingsWrap) headerSettingsWrap.classList.add('hidden');
   setHeaderSettingsMenuOpen(false);
@@ -1703,6 +1629,7 @@ function tryAutoLogin() {
     containerLogin.classList.add('hidden');
     updateClientDisplay(currentAccount);
     displayDate(currentAccount.locale);
+    applyUiLocale(currentAccount.locale);
     return true;
   }
   return false;
@@ -1715,8 +1642,7 @@ function logout() {
   hideAdminPanel();
   hideClientControls();
   containerLogin.classList.remove('hidden');
-  labelWelcome.textContent = 'Connectez-vous pour accéder à votre compte';
-  resetClientDisplay();
+  applyUiLocale(visitorLocale);
   updateLoginViewState();
   closeSidebar();
   clearSession();
@@ -1944,6 +1870,7 @@ loginForm.addEventListener('submit', async e => {
       containerLogin.classList.add('hidden');
       updateClientDisplay(currentAccount);
       displayDate(currentAccount.locale);
+      applyUiLocale(currentAccount.locale);
       saveSession(username, pin, 'user');
       inputUsername.value = inputPin.value = '';
       showSuccess('Connexion réussie.');
@@ -2144,7 +2071,7 @@ if (settingsPreferencesForm) {
     e.preventDefault();
     if (!currentAccount) return;
     const locale = settingsLocale.value;
-    if (!LOCALE_OPTIONS[locale]) return;
+    if (!LOCALE_CONFIG[locale]) return;
     currentAccount.locale = locale;
     currentAccount.currency = settingsCurrency.value || getLocaleCurrency(locale);
     currentAccount.preferences.hideBalanceHero = settingsHideBalanceHero.checked;
@@ -2152,10 +2079,9 @@ if (settingsPreferencesForm) {
     await persistAccounts();
     displayDate(currentAccount.locale);
     updateSettingsForms(currentAccount);
-    updateAllNavLabels();
-    updateNavPageHeader('settings', activeNavPanels.settings);
+    applyUiLocale(locale);
     updateUI(currentAccount);
-    showSuccess('Préférences enregistrées.');
+    showSuccess(t('localeUpdated', locale));
   });
 }
 
@@ -2479,6 +2405,7 @@ document.querySelectorAll('.menu-card[href], .sidebar-link[href]').forEach(link 
 
 // --- Init ---
 async function initApp() {
+  await initUiLocale();
   bindBankingInputs();
   populateLocaleOptions();
   populateCurrencyOptions();
@@ -2486,6 +2413,7 @@ async function initApp() {
 
   tryAutoLogin();
   rebindCurrentAccount();
+  applyUiLocale(getActiveLocale());
 
   const rawHash = (location.hash || '').replace('#', '').trim() || 'dashboard';
   if (isAdminSession) {
@@ -2510,8 +2438,6 @@ async function initApp() {
     }
   }
 
-  updateAllNavLabels();
-  updateChartVisibility();
   updateLoginViewState();
 }
 
