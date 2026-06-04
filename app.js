@@ -82,24 +82,22 @@ function isValidBic(normalized) {
 function validateBankAccountField(raw) {
   const value = normalizeBankAccountInput(raw);
   if (!value) {
-    return { ok: false, value, message: 'Indiquez un numéro de compte ou un IBAN.' };
+    return { ok: false, value, message: msg('valAccountRequired') };
   }
   if (!BANK_ACCOUNT_PATTERN.test(value)) {
-    return {
-      ok: false,
-      value,
-      message:
-        'Numéro de compte invalide : lettres et chiffres uniquement (5 à 34 caractères).',
-    };
+    return { ok: false, value, message: msg('valAccountInvalid') };
   }
   if (isIbanFormat(value) && !ibanCheckDigitsValid(value)) {
-    return { ok: false, value, message: 'IBAN invalide : vérifiez le numéro saisi.' };
+    return { ok: false, value, message: msg('valIbanInvalid') };
   }
   if (!isValidBankAccount(value)) {
     return {
       ok: false,
       value,
-      message: `Le numéro de compte doit comporter entre ${BANK_ACCOUNT_MIN_LEN} et ${BANK_ACCOUNT_MAX_LEN} caractères.`,
+      message: msg('valAccountLength', {
+        min: BANK_ACCOUNT_MIN_LEN,
+        max: BANK_ACCOUNT_MAX_LEN,
+      }),
     };
   }
   return { ok: true, value };
@@ -108,15 +106,10 @@ function validateBankAccountField(raw) {
 function validateBicField(raw) {
   const value = normalizeBicInput(raw);
   if (!value) {
-    return { ok: false, value, message: 'Indiquez le code BIC / SWIFT.' };
+    return { ok: false, value, message: msg('valBicRequired') };
   }
   if (!isValidBic(value)) {
-    return {
-      ok: false,
-      value,
-      message:
-        'Code BIC invalide : 8 ou 11 caractères (4 lettres banque, 2 lettres pays, 2 caractères lieu, optionnel 3 caractères agence). Ex. BNPAFRPP.',
-    };
+    return { ok: false, value, message: msg('valBicInvalid') };
   }
   return { ok: true, value };
 }
@@ -264,25 +257,43 @@ function replaceAccounts(nextAccounts) {
 }
 
 let serverSyncAvailable = false;
+let syncOfflineNotified = false;
 
-async function syncAccountsFromServer() {
-  try {
-    const response = await fetch(ACCOUNTS_API, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const parsed = await response.json();
-    if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
-    replaceAccounts(parsed.map(cloneAccount));
-    saveAccounts(accounts);
-    serverSyncAvailable = true;
-    rebindCurrentAccount();
-    return true;
-  } catch (error) {
-    serverSyncAvailable = false;
-    replaceAccounts(loadAccounts());
-    rebindCurrentAccount();
-    console.warn('Synchronisation serveur indisponible, cache local utilisé.', error);
-    return false;
+async function syncAccountsFromServer({ notify = false } = {}) {
+  const wasOnline = serverSyncAvailable;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(ACCOUNTS_API, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const parsed = await response.json();
+      if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
+      replaceAccounts(parsed.map(cloneAccount));
+      saveAccounts(accounts);
+      serverSyncAvailable = true;
+      rebindCurrentAccount();
+      if (notify && !wasOnline && syncOfflineNotified) {
+        showSuccess(msg('syncRestored'));
+      }
+      syncOfflineNotified = false;
+      return true;
+    } catch (error) {
+      if (attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        continue;
+      }
+      serverSyncAvailable = false;
+      replaceAccounts(loadAccounts());
+      rebindCurrentAccount();
+      console.warn('Synchronisation serveur indisponible, cache local utilisé.', error);
+      if (notify && !syncOfflineNotified) {
+        showInfo(msg('syncOffline'));
+        syncOfflineNotified = true;
+      }
+      return false;
+    }
   }
+  return false;
 }
 
 function rebindCurrentAccount() {
@@ -587,8 +598,11 @@ async function initUiLocale() {
   applyUiLocale(visitorLocale);
 }
 
+const DEMO_DISMISS_KEY = 'ecorisDemoDismissed';
+
 function applyUiLocale(locale = getActiveLocale()) {
   const safe = applyPageI18n(locale);
+  updateDemoBanner();
   if (labelWelcome) {
     if (isAdminSession) {
       labelWelcome.textContent = t('adminWelcome', safe);
@@ -662,6 +676,18 @@ const activeNavPanels = {
 
 function getNavLang(locale = getActiveLocale()) {
   return getLangFromLocale(locale);
+}
+
+function msg(key, vars) {
+  return t(key, getActiveLocale(), vars);
+}
+
+function getMovementLabel(line, locale = getActiveLocale()) {
+  if (line.label === RELEVE_LABEL_IN) return msg('releveIn');
+  if (line.label === RELEVE_LABEL_OUT) return msg('releveOut');
+  if (line.type === 'deposit') return msg('deposit');
+  if (line.type === 'withdrawal') return msg('withdrawal');
+  return line.label || line.type || '';
 }
 
 function getNavPanelFromHash(view) {
@@ -827,11 +853,12 @@ function showInfo(message) {
   showToast(message, 'info');
 }
 
-async function withLoader(fn, message = 'Chargement…') {
+async function withLoader(fn, message = null) {
+  const loaderMessage = message || msg('loading');
   const loader = document.getElementById('appLoader');
   const loaderText = document.getElementById('appLoaderText');
   if (loader) {
-    if (loaderText) loaderText.textContent = message;
+    if (loaderText) loaderText.textContent = loaderMessage;
     loader.classList.remove('hidden');
   }
 
@@ -850,7 +877,9 @@ function exportStatement(account) {
   const balance = getAccountBalance(account);
   const totalIn = account.movements.filter(m => m > 0).reduce((s, m) => s + m, 0);
   const totalOut = account.movements.filter(m => m < 0).reduce((s, m) => s + m, 0);
-  const now = new Date().toLocaleDateString('fr-FR', {
+  const loc = account.locale || getActiveLocale();
+  const lang = getLangFromLocale(loc);
+  const now = new Date().toLocaleDateString(loc, {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
@@ -858,11 +887,7 @@ function exportStatement(account) {
 
   const rows = lines
     .map((line, i) => {
-      const label =
-        MOVEMENT_LABEL_TRANSLATIONS[line.label] ||
-        MOVEMENT_LABEL_TRANSLATIONS[line.type] ||
-        line.label ||
-        line.type;
+      const label = getMovementLabel(line, loc);
       return `
         <tr>
           <td>${i + 1}</td>
@@ -874,10 +899,10 @@ function exportStatement(account) {
     .join('');
 
   const html = `<!DOCTYPE html>
-<html lang="fr">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8" />
-  <title>Relevé — ${account.owner}</title>
+  <title>${msg('exportTitle')} — ${account.owner}</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 32px; color: #1a1a2e; }
     h1 { color: #1c7ed6; margin-bottom: 4px; }
@@ -893,17 +918,17 @@ function exportStatement(account) {
 </head>
 <body>
   <h1>Ecorise Banque</h1>
-  <p class="meta">Relevé de compte — ${account.owner} (${account.username})<br/>Édité le ${now}</p>
+  <p class="meta">${t('exportTitle', loc)} — ${account.owner} (${account.username})<br/>${t('exportEdited', loc)} ${now}</p>
   <table>
     <thead>
-      <tr><th>#</th><th>Date</th><th>Opération</th><th>Montant</th></tr>
+      <tr><th>${t('exportColNum', loc)}</th><th>${t('exportColDate', loc)}</th><th>${t('exportColOperation', loc)}</th><th>${t('exportColAmount', loc)}</th></tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="totals">
-    <div><span>Total entrées</span><strong>${formatCurrency(totalIn, account.locale, account.currency)}</strong></div>
-    <div><span>Total sorties</span><strong>${formatCurrency(totalOut, account.locale, account.currency)}</strong></div>
-    <div class="balance"><span>Solde</span><span>${formatCurrency(balance, account.locale, account.currency)}</span></div>
+    <div><span>${t('totalIn', loc)}</span><strong>${formatCurrency(totalIn, account.locale, account.currency)}</strong></div>
+    <div><span>${t('totalOut', loc)}</span><strong>${formatCurrency(totalOut, account.locale, account.currency)}</strong></div>
+    <div class="balance"><span>${t('balance', loc)}</span><span>${formatCurrency(balance, account.locale, account.currency)}</span></div>
   </div>
   <script>window.onload = () => window.print();</script>
 </body>
@@ -1055,7 +1080,7 @@ async function persistAccounts() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
   } catch (error) {
     console.warn('Impossible de synchroniser les comptes sur le serveur.', error);
-    showError('Modification enregistrée localement. Vérifiez que le serveur Node est lancé.');
+    showError(msg('syncSaveLocal'));
   }
 }
 
@@ -1090,7 +1115,7 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
   }
 
   if (lines.length === 0) {
-    containerMovements.innerHTML = '<p class="empty-state">Aucune opération disponible.</p>';
+    containerMovements.innerHTML = `<p class="empty-state">${msg('noMovements')}</p>`;
     updateMovementsToggle(0, 0, sort);
     if (statementFooter) statementFooter.classList.add('hidden');
     if (spendingChart) spendingChart.innerHTML = '';
@@ -1098,15 +1123,11 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
   }
 
   lines.forEach((line, i) => {
-    const operationLabel =
-      MOVEMENT_LABEL_TRANSLATIONS[line.label] ||
-      MOVEMENT_LABEL_TRANSLATIONS[line.type] ||
-      line.label ||
-      line.type;
+    const operationLabel = getMovementLabel(line, account.locale);
     const balanceAfter = balanceByIndex.get(line.index);
     const balanceHtml =
       !sort && balanceAfter !== undefined
-        ? `<p class="movement-balance">Solde : ${formatCurrency(balanceAfter, account.locale, account.currency)}</p>`
+        ? `<p class="movement-balance">${msg('movementBalancePrefix')} : ${formatCurrency(balanceAfter, account.locale, account.currency)}</p>`
         : '';
 
     containerMovements.insertAdjacentHTML(
@@ -1143,10 +1164,10 @@ function updateMovementsToggle(total, shown, sort) {
 
   btnShowMoreMovements.classList.remove('hidden');
   btnShowMoreMovements.textContent = movementsExpanded
-    ? 'Montrer moins'
+    ? msg('showLess')
     : total - shown > 1
-      ? `Montrer plus (${total - shown} opérations)`
-      : 'Montrer plus (1 opération)';
+      ? msg('showMoreOps', { n: total - shown })
+      : msg('showMoreOne');
 }
 
 function renderStatementFooter(account) {
@@ -1169,15 +1190,15 @@ function renderStatementFooter(account) {
   statementFooter.classList.remove('hidden');
   statementFooter.innerHTML = `
     <div class="statement-footer__row">
-      <span>Total entrées</span>
+      <span>${msg('totalIn')}</span>
       <strong>${formatCurrency(totalIn, account.locale, account.currency)}</strong>
     </div>
     <div class="statement-footer__row">
-      <span>Total sorties</span>
+      <span>${msg('totalOut')}</span>
       <strong>${formatCurrency(totalOut, account.locale, account.currency)}</strong>
     </div>
     <div class="statement-footer__row statement-footer__row--total">
-      <span>Solde du relevé</span>
+      <span>${msg('statementBalanceLabel')}</span>
       <strong>${formatCurrency(statementBalance, account.locale, account.currency)}</strong>
     </div>`;
 }
@@ -1227,6 +1248,25 @@ function resetClientDisplay() {
   if (sidebarClientGreeting) {
     sidebarClientGreeting.textContent = t('clientArea', getActiveLocale());
   }
+}
+
+function updateDemoBanner() {
+  const banner = document.getElementById('demoBanner');
+  if (!banner) return;
+  const show =
+    !!currentAccount &&
+    !isAdminSession &&
+    !sessionStorage.getItem(DEMO_DISMISS_KEY);
+  banner.classList.toggle('hidden', !show);
+}
+
+function dismissDemoBanner() {
+  try {
+    sessionStorage.setItem(DEMO_DISMISS_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+  updateDemoBanner();
 }
 
 function updateUI(account) {
@@ -1478,7 +1518,7 @@ function showLoginPrompt(view) {
   }
 
   if (!alreadyPrompted) {
-    showInfo('Connectez-vous pour accéder à cette page.');
+    showInfo(msg('loginRequired'));
   }
 }
 
@@ -1663,7 +1703,7 @@ function setMenuToggleState(isOpen) {
   if (!btnMenu) return;
   btnMenu.classList.toggle('is-open', isOpen);
   btnMenu.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  btnMenu.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
+  btnMenu.setAttribute('aria-label', isOpen ? msg('close') : msg('openMenu'));
 }
 
 function openSidebar() {
@@ -1858,7 +1898,7 @@ loginForm.addEventListener('submit', async e => {
     if (isAdminLogin(username, pin)) {
       showAdminPanel();
       saveSession(username, pin, 'admin');
-      showSuccess('Connexion administrateur réussie.');
+      showSuccess(msg('adminLoginSuccess'));
       inputUsername.value = inputPin.value = '';
       return;
     }
@@ -1873,14 +1913,14 @@ loginForm.addEventListener('submit', async e => {
       applyUiLocale(currentAccount.locale);
       saveSession(username, pin, 'user');
       inputUsername.value = inputPin.value = '';
-      showSuccess('Connexion réussie.');
+      showSuccess(msg('loginSuccess'));
       const target = pendingView || 'dashboard';
       pendingView = null;
       showView(target);
     } else {
-      showError('Identifiant ou mot de passe incorrect.');
+      showError(msg('loginFailed'));
     }
-  }, 'Connexion en cours…');
+  }, msg('signingIn'));
 });
 
 adminEditForm.addEventListener('submit', async e => {
@@ -2040,7 +2080,7 @@ if (settingsProfileForm) {
     if (!currentAccount) return;
     const name = settingsName.value.trim();
     if (!name) {
-      showError('Le nom complet est requis.');
+      showError(msg('fullNameRequired'));
       return;
     }
     currentAccount.owner = name;
@@ -2048,7 +2088,7 @@ if (settingsProfileForm) {
     updateClientDisplay(currentAccount);
     updateSettingsForms(currentAccount);
     updateUI(currentAccount);
-    showSuccess('Profil mis à jour.');
+    showSuccess(msg('profileUpdated'));
   });
 }
 
@@ -2062,7 +2102,7 @@ if (settingsNotificationsForm) {
       operations: settingsNotifyOperations.checked,
     };
     await persistAccounts();
-    showSuccess('Notifications mises à jour.');
+    showSuccess(msg('notificationsUpdated'));
   });
 }
 
@@ -2116,7 +2156,7 @@ if (settingsPrivacyForm) {
     currentAccount.preferences.maskBalances = settingsMaskBalances.checked;
     await persistAccounts();
     updateUI(currentAccount);
-    showSuccess('Paramètres de confidentialité enregistrés.');
+    showSuccess(msg('privacyUpdated'));
   });
 }
 
@@ -2164,9 +2204,9 @@ investForm.addEventListener('submit', e => {
     persistAccounts();
     renderInvestments(currentAccount);
     updateUI(currentAccount);
-    showSuccess('Investissement effectué.');
+    showSuccess(msg('investmentDone'));
   } else {
-    showError('Montant invalide ou solde insuffisant.');
+    showError(msg('investmentFailed'));
   }
 });
 
@@ -2176,7 +2216,7 @@ ticketForm.addEventListener('submit', e => {
   const subject = ticketSubject.value.trim();
   const message = ticketMessage.value.trim();
   if (!subject || !message) {
-    showError('Veuillez remplir l’objet et le message.');
+    showError(msg('fillTicketFields'));
     return;
   }
   currentAccount.supportRequests.push({
@@ -2188,7 +2228,7 @@ ticketForm.addEventListener('submit', e => {
   ticketSubject.value = ticketMessage.value = '';
   persistAccounts();
   renderTickets(currentAccount);
-  showSuccess('Ticket de support envoyé.');
+  showSuccess(msg('ticketSent'));
 });
 
 profileForm.addEventListener('submit', e => {
@@ -2197,7 +2237,7 @@ profileForm.addEventListener('submit', e => {
   const name = serviceName.value.trim();
   const pin = servicePin.value.trim();
   if (!name) {
-    showError('Le nom est requis.');
+    showError(msg('nameRequired'));
     return;
   }
 
@@ -2237,7 +2277,7 @@ addBeneficiaryForm.addEventListener('submit', e => {
   const accountCheck = validateBankAccountField(beneficiaryAccount.value);
   const bicCheck = validateBicField(beneficiaryBic.value);
   if (!name || !email) {
-    showError('Complétez tous les champs bénéficiaire.');
+    showError(msg('fillBeneficiaryFields'));
     return;
   }
   if (!accountCheck.ok) {
@@ -2259,7 +2299,7 @@ addBeneficiaryForm.addEventListener('submit', e => {
   beneficiaryName.value = beneficiaryEmail.value = beneficiaryAccount.value = beneficiaryBic.value = '';
   persistAccounts();
   renderBeneficiaries(currentAccount);
-  showSuccess('Bénéficiaire ajouté.');
+  showSuccess(msg('beneficiaryAdded'));
 });
 
 beneficiaryList.addEventListener('click', e => {
@@ -2280,7 +2320,7 @@ supportForm.addEventListener('submit', e => {
     return;
   }
   supportSubject.value = supportMessage.value = '';
-  showSuccess('Votre demande a bien été envoyée au support.');
+  showSuccess(msg('supportRequestSent'));
 });
 
 transferForm.addEventListener('submit', async e => {
@@ -2307,7 +2347,7 @@ transferForm.addEventListener('submit', async e => {
 
   await withLoader(async () => {
     openTransferBlockedModal();
-  }, 'Traitement du virement…');
+  }, msg('processingTransfer'));
 });
 
 transferBlockedClose?.addEventListener('click', closeTransferBlockedModal);
@@ -2324,13 +2364,13 @@ document.addEventListener('keydown', e => {
 loanForm.addEventListener('submit', e => {
   e.preventDefault();
   if (!currentAccount) return;
-  showError('Prêt indisponible.');
+  showError(msg('loanUnavailable'));
 });
 
 btnSort.addEventListener('click', () => {
   sorted = !sorted;
   movementsExpanded = false;
-  btnSort.textContent = sorted ? 'Trier ◢' : 'Trier';
+  btnSort.textContent = sorted ? msg('sortActive') : msg('sort');
   updateUI(currentAccount);
 });
 
@@ -2362,8 +2402,8 @@ if (btnExportStatement) {
   btnExportStatement.addEventListener('click', () => {
     if (!currentAccount) return;
     const ok = exportStatement(currentAccount);
-    if (ok) showSuccess('Relevé ouvert — utilisez Imprimer ou Enregistrer en PDF.');
-    else showError('Autorisez les pop-ups pour exporter le relevé.');
+    if (ok) showSuccess(msg('exportOpened'));
+    else showError(msg('exportPopup'));
   });
 }
 
@@ -2409,7 +2449,7 @@ async function initApp() {
   bindBankingInputs();
   populateLocaleOptions();
   populateCurrencyOptions();
-  await syncAccountsFromServer();
+  await syncAccountsFromServer({ notify: true });
 
   tryAutoLogin();
   rebindCurrentAccount();
@@ -2439,6 +2479,11 @@ async function initApp() {
   }
 
   updateLoginViewState();
+}
+
+const demoBannerDismiss = document.getElementById('demoBannerDismiss');
+if (demoBannerDismiss) {
+  demoBannerDismiss.addEventListener('click', dismissDemoBanner);
 }
 
 initApp();
