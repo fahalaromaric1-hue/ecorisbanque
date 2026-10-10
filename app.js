@@ -176,54 +176,300 @@ function bindBankingInputs() {
 
 const defaultAccounts = [
   {
-    owner: 'Ingo Franc',
-    username: 'ingofranc@gmail.com',
-    pin: 'franc123',
-    movements: [200000, 300000, 350000, 250000, -5000, -12000, 4500, -1400, 4800, -950, 14250, 30600, 800000, 2400000],
-    movementDates: [],
-    movementLabels: ['', '', '', '', '', '', '', '', '', '', '', '', 'Virement reçu — 800000 EUR', 'Virement reçu — 2400000 EUR'],
-    interestRate: 1.2,
-    locale: 'fr-FR',
-    currency: 'EUR',
-    notifications: { email: true, sms: false },
-    beneficiaries: [],
-    accountProducts: [
-      { name: 'Compte courant', status: 'Actif' },
-      { name: 'Livret épargne', status: 'Actif' },
+    "owner": "Ingo Franc",
+    "username": "ingofranc@gmail.com",
+    "pin": "franc123",
+    "movements": [
+      200000,
+      300000,
+      350000,
+      250000,
+      -5000,
+      -12000,
+      4500,
+      -1400,
+      4800,
+      200,
+      -15,
+      -185,
+      -950,
+      14250,
+      30600,
+      800000,
+      2400000
     ],
-    savings: [
-      { name: 'Livret A', balance: 1200 },
-      { name: 'Plan épargne', balance: 5400 },
+    "movementDates": [
+      "2026-06-12T12:42:33.328Z",
+      "2026-06-20T14:57:47.688Z",
+      "2026-06-26T16:51:50.318Z",
+      "2026-07-03T13:03:39.464Z",
+      "2026-07-05T17:54:09.767Z",
+      "2026-07-12T18:37:54.777Z",
+      "2026-07-17T14:55:42.203Z",
+      "2026-07-27T19:47:26.073Z",
+      "2026-08-04T19:56:25.553Z",
+      "2026-08-06T09:20:00.000Z",
+      "2026-08-07T14:10:00.000Z",
+      "2026-08-08T16:45:00.000Z",
+      "2026-08-10T10:20:32.121Z",
+      "2026-08-10T17:49:52.108Z",
+      "2026-08-11T10:09:00.303Z",
+      "2026-08-11T11:03:05.714Z",
+      "2026-08-11T18:22:38.074Z"
     ],
-    investments: [{ product: 'Actions', amount: 200, date: '2026-05-10' }],
-    supportRequests: [
+    "movementLabels": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Dépôt espèces",
+      "Frais de tenue de compte",
+      "Retrait DAB",
+      "",
+      "",
+      "",
+      "Virement reçu — 800000 EUR",
+      "Virement reçu — 2400000 EUR"
+    ],
+    "interestRate": 1.2,
+    "locale": "fr-FR",
+    "currency": "EUR",
+    "notifications": {
+      "email": true,
+      "sms": false,
+      "operations": false
+    },
+    "beneficiaries": [],
+    "accountProducts": [
       {
-        subject: 'Bloqué sur transfert',
-        message: 'Impossible de finaliser le virement.',
-        status: 'Ouvert',
-        date: '2026-05-28',
+        "name": "Compte courant",
+        "status": "Actif"
       },
+      {
+        "name": "Livret épargne",
+        "status": "Actif"
+      }
     ],
+    "savings": [
+      {
+        "name": "Livret A",
+        "balance": 1200
+      },
+      {
+        "name": "Plan épargne",
+        "balance": 5400
+      }
+    ],
+    "investments": [
+      {
+        "product": "Actions",
+        "amount": 200,
+        "date": "2026-05-10"
+      }
+    ],
+    "supportRequests": [
+      {
+        "subject": "Bloqué sur transfert",
+        "message": "Impossible de finaliser le virement.",
+        "status": "Ouvert",
+        "date": "2026-05-28"
+      }
+    ],
+    "preferences": {
+      "hideBalanceHero": false,
+      "compactMovements": false,
+      "maskBalances": false
+    },
+    "statementBalance": 4334800,
+    "balance": 4334800
   },
   {
-    owner: 'Marie Dubois',
-    username: 'md',
-    pin: '2222',
-    movements: [500, 340, -300, -20, -460, 200, 190, 1000],
-    movementDates: [],
-    interestRate: 1.5,
-    locale: 'fr-FR',
-    currency: 'EUR',
-    notifications: { email: true, sms: false },
-    beneficiaries: [],
-    accountProducts: [
-      { name: 'Compte courant', status: 'Actif' },
-      { name: 'Compte joint', status: 'Actif' },
+    "owner": "Marie Dubois",
+    "username": "md",
+    "pin": "2222",
+    "movements": [
+      500,
+      340,
+      -300,
+      -20,
+      -460,
+      200,
+      190,
+      1000,
+      80000,
+      20000,
+      15000,
+      -500,
+      -12,
+      -800,
+      12215
     ],
-    savings: [{ name: 'Livret A', balance: 900 }],
-    investments: [{ product: 'Fonds', amount: 120, date: '2026-05-26' }],
-    supportRequests: [],
+    "movementDates": [
+      "2026-06-12T08:26:02.332Z",
+      "2026-06-20T11:33:17.150Z",
+      "2026-06-27T06:44:22.231Z",
+      "2026-07-05T11:17:42.659Z",
+      "2026-07-12T13:00:36.327Z",
+      "2026-07-20T06:20:07.294Z",
+      "2026-07-27T09:36:03.009Z",
+      "2026-08-04T18:33:36.555Z",
+      "2026-08-08T08:30:00.000Z",
+      "2026-08-12T10:15:00.000Z",
+      "2026-08-16T11:40:00.000Z",
+      "2026-08-20T18:05:00.000Z",
+      "2026-08-24T07:50:00.000Z",
+      "2026-08-28T09:25:00.000Z",
+      "2026-09-02T15:10:00.000Z"
+    ],
+    "interestRate": 1.5,
+    "locale": "fr-FR",
+    "currency": "EUR",
+    "notifications": {
+      "email": true,
+      "sms": false,
+      "operations": false
+    },
+    "beneficiaries": [],
+    "accountProducts": [
+      {
+        "name": "Compte courant",
+        "status": "Actif"
+      },
+      {
+        "name": "Compte joint",
+        "status": "Actif"
+      }
+    ],
+    "savings": [
+      {
+        "name": "Livret A",
+        "balance": 900
+      }
+    ],
+    "investments": [
+      {
+        "product": "Fonds",
+        "amount": 120,
+        "date": "2026-05-26"
+      }
+    ],
+    "supportRequests": [],
+    "preferences": {
+      "hideBalanceHero": false,
+      "compactMovements": false,
+      "maskBalances": false
+    },
+    "movementLabels": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Virement reçu — salaire",
+      "Dépôt espèces",
+      "Virement reçu — remboursement",
+      "Retrait DAB",
+      "Frais de tenue de compte",
+      "Virement émis — loyer",
+      "Virement reçu — versement complémentaire"
+    ],
+    "statementBalance": 127353,
+    "balance": 127353
   },
+  {
+    "owner": "sabrine nattes",
+    "username": "sabrine.nattes@ecoris.demo",
+    "pin": "Galet-6744",
+    "movements": [
+      400000,
+      250000,
+      250000,
+      150000,
+      100000,
+      80000,
+      -400,
+      -250,
+      -18,
+      -12,
+      -1200,
+      -186,
+      -320,
+      -85,
+      7027
+    ],
+    "movementDates": [
+      "2026-06-16T09:00:00.000Z",
+      "2026-06-20T08:20:00.000Z",
+      "2026-06-24T08:20:00.000Z",
+      "2026-06-28T11:05:00.000Z",
+      "2026-07-02T10:30:00.000Z",
+      "2026-07-06T14:15:00.000Z",
+      "2026-07-10T18:40:00.000Z",
+      "2026-07-14T12:10:00.000Z",
+      "2026-07-18T07:45:00.000Z",
+      "2026-07-22T07:45:00.000Z",
+      "2026-07-26T09:05:00.000Z",
+      "2026-07-30T16:20:00.000Z",
+      "2026-08-03T13:55:00.000Z",
+      "2026-08-07T17:30:00.000Z",
+      "2026-08-11T10:00:00.000Z"
+    ],
+    "interestRate": 1.2,
+    "locale": "fr-FR",
+    "currency": "EUR",
+    "notifications": {
+      "email": true,
+      "sms": false,
+      "operations": false
+    },
+    "preferences": {
+      "hideBalanceHero": false,
+      "compactMovements": false,
+      "maskBalances": false
+    },
+    "beneficiaries": [],
+    "accountProducts": [
+      {
+        "name": "Compte courant",
+        "status": "Actif"
+      }
+    ],
+    "savings": [
+      {
+        "name": "Livret A",
+        "balance": 0
+      }
+    ],
+    "investments": [],
+    "supportRequests": [],
+    "movementLabels": [
+      "Dépôt d'ouverture",
+      "Virement reçu — salaire",
+      "Virement reçu — salaire juin",
+      "Dépôt espèces",
+      "Virement reçu — remboursement",
+      "Virement reçu — prestation",
+      "Retrait DAB",
+      "Retrait DAB — agence",
+      "Frais de tenue de compte",
+      "Frais bancaires",
+      "Virement émis — loyer",
+      "Virement émis — électricité",
+      "Paiement carte — courses",
+      "Paiement carte — carburant",
+      "Virement reçu — versement"
+    ],
+    "balance": 1234556,
+    "statementBalance": 1234556
+  }
 ];
 
 
