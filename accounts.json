@@ -15,9 +15,27 @@
       4800,
       -950,
       14250,
-      30600
+      30600,
+      800000,
+      2400000
     ],
     "movementDates": [],
+    "movementLabels": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Virement reçu — 800000 EUR",
+      "Virement reçu — 2400000 EUR"
+    ],
     "interestRate": 1.2,
     "locale": "fr-FR",
     "currency": "EUR",
