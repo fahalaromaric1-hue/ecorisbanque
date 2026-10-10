@@ -214,9 +214,22 @@
         <div class="admin-panel__header">
           <div>
             <h2>Administration Ecorise Banque</h2>
-            <p>Gérez les comptes clients : le solde modifié met à jour automatiquement le relevé (entrées, sorties et solde final).</p>
+            <p>Créez un compte client, puis modifiez son nom, son solde et ses virements. Le solde modifié met à jour le relevé.</p>
           </div>
         </div>
+
+        <form class="form admin-create" id="adminCreateForm">
+          <h3>Nouveau compte client</h3>
+          <p class="admin-hint">Le compte démarre à 0 €. Un e-mail fictif et un mot de passe sont générés, puis enregistrés pour la connexion.</p>
+          <label for="adminCreateName">Nom du compte</label>
+          <input id="adminCreateName" type="text" placeholder="Nom complet" required />
+          <button class="btn btn--primary" type="submit">Créer le compte</button>
+          <div id="adminCreatedCredentials" class="admin-credentials hidden" role="status">
+            <p><strong>Compte créé.</strong> Notez ces identifiants : ils servent à la connexion client.</p>
+            <p>E-mail : <code id="adminCreatedEmail"></code></p>
+            <p>Mot de passe : <code id="adminCreatedPassword"></code></p>
+          </div>
+        </form>
 
         <div class="admin-grid">
           <div class="card admin-users-card">
@@ -252,6 +265,27 @@
 
               <button class="btn btn--primary" type="submit">Enregistrer les modifications</button>
             </form>
+
+            <div id="adminTransfers" class="admin-transfers hidden">
+              <h3>Virements</h3>
+              <p id="adminTransferEmpty" class="admin-hint">Aucun virement sur ce compte.</p>
+              <ul id="adminTransferList" class="admin-transfer-list"></ul>
+              <form class="form" id="adminTransferForm">
+                <label for="adminTransferAmount">Montant (€)</label>
+                <input id="adminTransferAmount" type="number" min="0.01" step="0.01" required />
+
+                <label for="adminTransferLabel">Libellé</label>
+                <input id="adminTransferLabel" type="text" placeholder="Virement reçu" required />
+
+                <label for="adminTransferDirection">Sens</label>
+                <select id="adminTransferDirection">
+                  <option value="in">Reçu</option>
+                  <option value="out">Émis</option>
+                </select>
+
+                <button class="btn btn--secondary" type="submit">Ajouter un virement</button>
+              </form>
+            </div>
           </div>
         </div>
       </section>

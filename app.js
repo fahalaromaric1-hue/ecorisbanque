@@ -523,7 +523,7 @@ const getAccountBalance = account =>
 const pushMovement = (account, amount, label = '') => {
   account.movements.push(amount);
   ensureMovementLabels(account);
-  account.movementLabels.push(label);
+  account.movementLabels[account.movements.length - 1] = label;
   assignDateToNewMovement(account);
 };
 
@@ -1067,6 +1067,18 @@ const adminEditName = document.getElementById('adminEditName');
 const adminEditPin = document.getElementById('adminEditPin');
 const adminEditBalance = document.getElementById('adminEditBalance');
 const adminCurrentBalance = document.getElementById('adminCurrentBalance');
+const adminCreateForm = document.getElementById('adminCreateForm');
+const adminCreateName = document.getElementById('adminCreateName');
+const adminCreatedCredentials = document.getElementById('adminCreatedCredentials');
+const adminCreatedEmail = document.getElementById('adminCreatedEmail');
+const adminCreatedPassword = document.getElementById('adminCreatedPassword');
+const adminTransfers = document.getElementById('adminTransfers');
+const adminTransferList = document.getElementById('adminTransferList');
+const adminTransferEmpty = document.getElementById('adminTransferEmpty');
+const adminTransferForm = document.getElementById('adminTransferForm');
+const adminTransferAmount = document.getElementById('adminTransferAmount');
+const adminTransferLabel = document.getElementById('adminTransferLabel');
+const adminTransferDirection = document.getElementById('adminTransferDirection');
 
 async function persistAccounts() {
   saveAccounts(accounts);
@@ -1567,6 +1579,109 @@ function showView(view, options = {}) {
   if (!options.keepSidebar) closeSidebar();
 }
 
+const DEMO_EMAIL_DOMAIN = 'ecoris.demo';
+
+function slugifyAccountName(name) {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/^\.+|\.+$/g, '')
+    .replace(/\.{2,}/g, '.');
+}
+
+function generateClientEmail(owner) {
+  const base = slugifyAccountName(owner) || 'client';
+  const taken = new Set(accounts.map(account => String(account.username).toLowerCase()));
+  taken.add(ADMIN.username.toLowerCase());
+  let email = `${base}@${DEMO_EMAIL_DOMAIN}`;
+  let suffix = 2;
+  while (taken.has(email)) {
+    email = `${base}${suffix}@${DEMO_EMAIL_DOMAIN}`;
+    suffix += 1;
+  }
+  return email;
+}
+
+function generateClientPassword(owner) {
+  const words = ['Rivage', 'Cedre', 'Brise', 'Noyer', 'Sauge', 'Azur', 'Erable', 'Galet'];
+  const foldedName = slugifyAccountName(owner).replace(/\./g, '');
+  for (let attempt = 0; attempt < words.length; attempt += 1) {
+    const word = words[(attempt + Math.floor(Math.random() * words.length)) % words.length];
+    const digits = String(1000 + Math.floor(Math.random() * 9000));
+    const password = `${word}-${digits}`;
+    const foldedPassword = password.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const collides =
+      foldedName &&
+      (foldedPassword.includes(foldedName) || foldedName.includes(foldedPassword));
+    if (!collides && password.length >= 8) return password;
+  }
+  return `Ecoris-${String(100000 + Math.floor(Math.random() * 900000))}`;
+}
+
+function rememberAccountBalance(account) {
+  const balance = roundAmount(getAccountBalance(account));
+  account.balance = balance;
+  account.statementBalance = balance;
+  return balance;
+}
+
+function renderAdminTransfers(username) {
+  if (!adminTransfers || !adminTransferList) return;
+  const account = accounts.find(acc => acc.username === username);
+  if (!account) {
+    adminTransfers.classList.add('hidden');
+    adminTransferList.innerHTML = '';
+    return;
+  }
+
+  adminTransfers.classList.remove('hidden');
+  ensureMovementLabels(account);
+  ensureMovementDatesLength(account);
+  adminTransferList.innerHTML = '';
+  if (adminTransferEmpty) adminTransferEmpty.classList.toggle('hidden', account.movements.length > 0);
+
+  account.movements.forEach((amount, index) => {
+    const storedLabel = (account.movementLabels[index] || '').trim();
+    const label = storedLabel || (amount >= 0 ? 'Virement reçu' : 'Virement émis');
+    const direction = amount > 0 ? 'Reçu' : amount < 0 ? 'Émis' : 'Nul';
+    const li = document.createElement('li');
+    const info = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = label;
+    const meta = document.createElement('span');
+    meta.textContent = `${direction} · ${formatCurrency(amount, account.locale, account.currency)}`;
+    info.append(title, meta);
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn--small';
+    button.textContent = 'Retirer';
+    button.addEventListener('click', () => {
+      removeAdminTransfer(username, index);
+    });
+    li.append(info, button);
+    adminTransferList.appendChild(li);
+  });
+}
+
+function refreshAdminAccount(username) {
+  renderAdminUserList();
+  if (adminSelectUser) adminSelectUser.value = username;
+  adminUserList.querySelectorAll('li').forEach(li => {
+    li.classList.toggle('selected', li.dataset.username === username);
+  });
+  fillAdminEditForm(username);
+}
+
+function showCreatedCredentials(email, password) {
+  if (!adminCreatedCredentials) return;
+  adminCreatedEmail.textContent = email;
+  adminCreatedPassword.textContent = password;
+  adminCreatedCredentials.classList.remove('hidden');
+}
+
 function fillAdminEditForm(username) {
   const account = accounts.find(acc => acc.username === username);
   if (!account) {
@@ -1574,6 +1689,7 @@ function fillAdminEditForm(username) {
     if (adminEditPin) adminEditPin.value = '';
     adminEditBalance.value = '';
     adminCurrentBalance.textContent = 'Solde actuel : —';
+    renderAdminTransfers('');
     return;
   }
   const balance = getAccountBalance(account);
@@ -1581,6 +1697,7 @@ function fillAdminEditForm(username) {
   if (adminEditPin) adminEditPin.value = '';
   adminEditBalance.value = balance.toFixed(2);
   adminCurrentBalance.textContent = `Solde actuel : ${formatCurrency(balance, account.locale, account.currency)}`;
+  renderAdminTransfers(username);
 }
 
 function renderAdminUserList() {
@@ -1969,9 +2086,7 @@ adminEditForm.addEventListener('submit', async e => {
     account.statementBalance = roundAmount(getAccountBalance(account));
     await persistAccounts();
 
-    renderAdminUserList();
-    adminSelectUser.value = username;
-    fillAdminEditForm(username);
+    refreshAdminAccount(username);
 
     if (currentAccount?.username === username) updateUI(currentAccount);
 
@@ -1991,6 +2106,95 @@ adminEditForm.addEventListener('submit', async e => {
     }
   }, 'Mise à jour du compte…');
 });
+
+if (adminCreateForm) {
+  adminCreateForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!isAdminSession) return;
+
+    const owner = adminCreateName.value.trim();
+    if (!owner) {
+      showError('Indiquez le nom du compte.');
+      return;
+    }
+
+    await withLoader(async () => {
+      const username = generateClientEmail(owner);
+      const pin = generateClientPassword(owner);
+      const account = createAccount(owner, username, pin);
+      account.movements = [];
+      account.movementDates = [];
+      account.movementLabels = [];
+      rememberAccountBalance(account);
+      accounts.push(account);
+      await persistAccounts();
+      adminCreateName.value = '';
+      showCreatedCredentials(username, pin);
+      refreshAdminAccount(username);
+      showSuccess(`Compte créé : ${owner}`);
+    }, 'Création du compte…');
+  });
+}
+
+async function removeAdminTransfer(username, index) {
+  if (!isAdminSession) return;
+  const account = accounts.find(acc => acc.username === username);
+  if (!account) return;
+  ensureMovementLabels(account);
+  ensureMovementDatesLength(account);
+  if (!Number.isInteger(index) || index < 0 || index >= account.movements.length) return;
+
+  const removed = account.movements[index];
+  account.movements.splice(index, 1);
+  account.movementDates.splice(index, 1);
+  account.movementLabels.splice(index, 1);
+  const balance = rememberAccountBalance(account);
+  await persistAccounts();
+  refreshAdminAccount(username);
+  showSuccess(
+    `Virement retiré. Solde : ${formatCurrency(balance, account.locale, account.currency)} (${formatCurrency(removed, account.locale, account.currency)})`
+  );
+}
+
+if (adminTransferForm) {
+  adminTransferForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!isAdminSession) return;
+
+    const username = adminSelectUser.value;
+    const account = accounts.find(acc => acc.username === username);
+    if (!account) {
+      showError('Sélectionnez un compte client.');
+      return;
+    }
+
+    const amount = roundAmount(Number(adminTransferAmount.value));
+    const label = adminTransferLabel.value.trim();
+    const direction = adminTransferDirection.value === 'out' ? 'out' : 'in';
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showError('Indiquez un montant supérieur à zéro.');
+      return;
+    }
+    if (!label) {
+      showError('Indiquez le libellé du virement.');
+      return;
+    }
+
+    await withLoader(async () => {
+      const signed = direction === 'out' ? -amount : amount;
+      pushMovement(account, signed, label);
+      const balance = rememberAccountBalance(account);
+      await persistAccounts();
+      adminTransferAmount.value = '';
+      adminTransferLabel.value = '';
+      adminTransferDirection.value = 'in';
+      refreshAdminAccount(username);
+      showSuccess(
+        `Virement ${direction === 'out' ? 'émis' : 'reçu'} ajouté. Solde : ${formatCurrency(balance, account.locale, account.currency)}`
+      );
+    }, 'Ajout du virement…');
+  });
+}
 
 signupForm.addEventListener('submit', e => {
   e.preventDefault();
