@@ -1313,6 +1313,9 @@ const adminEditName = document.getElementById('adminEditName');
 const adminEditPin = document.getElementById('adminEditPin');
 const adminEditBalance = document.getElementById('adminEditBalance');
 const adminCurrentBalance = document.getElementById('adminCurrentBalance');
+const adminAccess = document.getElementById('adminAccess');
+const adminAccessEmail = document.getElementById('adminAccessEmail');
+const adminAccessPassword = document.getElementById('adminAccessPassword');
 const adminCreateForm = document.getElementById('adminCreateForm');
 const adminCreateName = document.getElementById('adminCreateName');
 const adminCreatedCredentials = document.getElementById('adminCreatedCredentials');
@@ -1981,6 +1984,19 @@ function showCreatedCredentials(email, password) {
   adminCreatedCredentials.classList.remove('hidden');
 }
 
+function showAdminAccess(account) {
+  if (!adminAccess) return;
+  if (!account) {
+    adminAccess.classList.add('hidden');
+    if (adminAccessEmail) adminAccessEmail.textContent = '';
+    if (adminAccessPassword) adminAccessPassword.textContent = '';
+    return;
+  }
+  adminAccessEmail.textContent = account.username;
+  adminAccessPassword.textContent = String(account.pin ?? '');
+  adminAccess.classList.remove('hidden');
+}
+
 function fillAdminEditForm(username) {
   const account = accounts.find(acc => acc.username === username);
   if (!account) {
@@ -1988,6 +2004,7 @@ function fillAdminEditForm(username) {
     if (adminEditPin) adminEditPin.value = '';
     adminEditBalance.value = '';
     adminCurrentBalance.textContent = 'Solde actuel : —';
+    showAdminAccess(null);
     renderAdminTransfers('');
     return;
   }
@@ -1996,6 +2013,7 @@ function fillAdminEditForm(username) {
   if (adminEditPin) adminEditPin.value = '';
   adminEditBalance.value = balance.toFixed(2);
   adminCurrentBalance.textContent = `Solde actuel : ${formatCurrency(balance, account.locale, account.currency)}`;
+  showAdminAccess(account);
   renderAdminTransfers(username);
 }
 
