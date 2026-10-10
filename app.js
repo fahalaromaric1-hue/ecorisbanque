@@ -1666,8 +1666,8 @@ function tryAutoLogin() {
   if (acc) {
     currentAccount = acc;
     hideAdminPanel();
-    showClientControls();
     containerLogin.classList.add('hidden');
+    showClientControls();
     updateClientDisplay(currentAccount);
     displayDate(currentAccount.locale);
     applyUiLocale(currentAccount.locale);
@@ -1907,8 +1907,8 @@ loginForm.addEventListener('submit', async e => {
     currentAccount = accounts.find(acc => acc.username === username);
     if (currentAccount?.pin === pin) {
       hideAdminPanel();
-      showClientControls();
       containerLogin.classList.add('hidden');
+      showClientControls();
       updateClientDisplay(currentAccount);
       displayDate(currentAccount.locale);
       applyUiLocale(currentAccount.locale);
