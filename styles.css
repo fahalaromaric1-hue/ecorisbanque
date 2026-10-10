@@ -1199,12 +1199,25 @@ body.menu-open {
 }
 
 .admin-user-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 14px;
   border-radius: 12px;
   background: #f4f7fb;
   cursor: pointer;
   border: 2px solid transparent;
   transition: border-color 0.15s, background 0.15s;
+}
+
+.admin-user-list__identity {
+  min-width: 0;
+}
+
+.admin-user-list .admin-user-delete {
+  flex-shrink: 0;
+  background: var(--danger);
 }
 
 .admin-user-list li:hover {

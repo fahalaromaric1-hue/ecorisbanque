@@ -1620,6 +1620,59 @@ function generateClientPassword(owner) {
   return `Ecoris-${String(100000 + Math.floor(Math.random() * 900000))}`;
 }
 
+function isProtectedAdminAccount(username) {
+  return String(username || '').trim().toLowerCase() === ADMIN.username.toLowerCase();
+}
+
+function dropClientSession(username) {
+  const target = String(username || '').trim().toLowerCase();
+  const session = readSession();
+  if (session && session.role !== 'admin' && String(session.username || '').toLowerCase() === target) {
+    clearSession();
+  }
+  if (currentAccount && String(currentAccount.username || '').toLowerCase() === target) {
+    currentAccount = null;
+  }
+}
+
+async function deleteAdminAccount(username) {
+  if (!isAdminSession) return;
+  if (isProtectedAdminAccount(username)) {
+    showError('Le compte administrateur ne peut pas être supprimé.');
+    return;
+  }
+
+  const index = accounts.findIndex(acc => acc.username === username);
+  if (index < 0) return;
+  if (accounts.length <= 1) {
+    showError('Impossible de supprimer le dernier compte client.');
+    return;
+  }
+
+  const account = accounts[index];
+  const confirmed = window.confirm(
+    `Supprimer le compte de ${account.owner} (${account.username}) ?\n\nLe compte, ses virements et toutes ses données seront effacés. Cette action est irréversible.`
+  );
+  if (!confirmed) return;
+
+  accounts.splice(index, 1);
+  dropClientSession(username);
+  if (adminCreatedEmail && adminCreatedEmail.textContent === username && adminCreatedCredentials) {
+    adminCreatedCredentials.classList.add('hidden');
+  }
+  await persistAccounts();
+
+  const stillSelected = adminSelectUser && adminSelectUser.value === username;
+  renderAdminUserList();
+  if (stillSelected) {
+    adminSelectUser.value = '';
+    fillAdminEditForm('');
+  } else if (adminSelectUser?.value) {
+    refreshAdminAccount(adminSelectUser.value);
+  }
+  showSuccess(`Compte supprimé : ${account.owner}`);
+}
+
 function rememberAccountBalance(account) {
   const balance = roundAmount(getAccountBalance(account));
   account.balance = balance;
@@ -1705,12 +1758,30 @@ function renderAdminUserList() {
   adminSelectUser.innerHTML = '<option value="">— Choisir un compte —</option>';
 
   accounts.forEach(account => {
+    if (isProtectedAdminAccount(account.username)) return;
+
     const balance = getAccountBalance(account);
     const li = document.createElement('li');
     li.dataset.username = account.username;
-    li.innerHTML = `
-      <strong>${account.owner}</strong>
-      <span>${account.username} • ${formatCurrency(balance, account.locale, account.currency)}</span>`;
+
+    const identity = document.createElement('div');
+    identity.className = 'admin-user-list__identity';
+    const title = document.createElement('strong');
+    title.textContent = account.owner;
+    const meta = document.createElement('span');
+    meta.textContent = `${account.username} • ${formatCurrency(balance, account.locale, account.currency)}`;
+    identity.append(title, meta);
+
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'btn btn--small admin-user-delete';
+    removeButton.textContent = 'Supprimer';
+    removeButton.addEventListener('click', event => {
+      event.stopPropagation();
+      deleteAdminAccount(account.username);
+    });
+
+    li.append(identity, removeButton);
     li.addEventListener('click', () => {
       adminUserList.querySelectorAll('li').forEach(item => item.classList.remove('selected'));
       li.classList.add('selected');
