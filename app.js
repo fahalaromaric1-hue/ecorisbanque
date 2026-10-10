@@ -1618,8 +1618,7 @@ function showAdminPanel() {
   containerAdmin.classList.remove('hidden');
   applyUiLocale(visitorLocale);
   btnMenu.classList.remove('hidden');
-  if (headerSettingsWrap) headerSettingsWrap.classList.add('hidden');
-  setHeaderSettingsMenuOpen(false);
+  showAccountMenu({ admin: true });
   closeSidebar();
   renderAdminUserList();
   adminSelectUser.value = '';
@@ -1638,9 +1637,18 @@ function updateLoginViewState() {
   appRoot.classList.toggle('is-login-view', loginVisible);
 }
 
+function showAccountMenu({ admin = false } = {}) {
+  if (headerSettingsWrap) headerSettingsWrap.classList.remove('hidden');
+  document.querySelectorAll('#headerSettingsMenu > li').forEach(li => {
+    const isLogout = Boolean(li.querySelector('#btnLogout'));
+    li.classList.toggle('hidden', admin && !isLogout);
+  });
+  if (admin) setHeaderSettingsMenuOpen(true);
+}
+
 function showClientControls() {
   btnMenu.classList.remove('hidden');
-  if (headerSettingsWrap) headerSettingsWrap.classList.remove('hidden');
+  showAccountMenu({ admin: false });
   updateLoginViewState();
 }
 
