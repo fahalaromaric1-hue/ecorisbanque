@@ -5,6 +5,7 @@ const { DatabaseSync } = require('node:sqlite');
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'ecorisbanque.sqlite');
+const SQL_FILE = path.join(DATA_DIR, 'ecorisbanque.sql');
 const SEED_FILE = path.join(ROOT, 'accounts.json');
 
 class AccountStoreError extends Error {
@@ -241,7 +242,35 @@ function writeAccounts(accounts) {
   return loadAccounts();
 }
 
+function rebuildDatabaseFromSql() {
+  const script = fs.readFileSync(SQL_FILE, 'utf8');
+  const temporary = `${DB_FILE}.restoring`;
+  fs.rmSync(temporary, { force: true });
+  fs.rmSync(`${temporary}-wal`, { force: true });
+  fs.rmSync(`${temporary}-shm`, { force: true });
+
+  const created = new DatabaseSync(temporary);
+  try {
+    created.exec(script);
+  } catch (error) {
+    created.close();
+    fs.rmSync(temporary, { force: true });
+    fs.rmSync(`${temporary}-wal`, { force: true });
+    fs.rmSync(`${temporary}-shm`, { force: true });
+    throw error;
+  }
+  created.close();
+  fs.renameSync(temporary, DB_FILE);
+  console.log(`Base SQLite reconstruite depuis ${SQL_FILE}`);
+}
+
 function initStore() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+
+  if (!fs.existsSync(DB_FILE) && fs.existsSync(SQL_FILE)) {
+    rebuildDatabaseFromSql();
+  }
+
   openDatabase();
   if (isSeeded()) return;
 
@@ -253,6 +282,7 @@ function initStore() {
 
 module.exports = {
   DB_FILE,
+  SQL_FILE,
   AccountStoreError,
   initStore,
   loadAccounts,
