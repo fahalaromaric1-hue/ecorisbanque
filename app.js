@@ -494,53 +494,68 @@ function saveAccounts(data) {
   }
 }
 
-function replaceAccounts(nextAccounts) {
+function adoptAccounts(nextAccounts) {
   accounts.length = 0;
   nextAccounts.forEach(account => {
-    regularizeMovementHistory(account);
     ensureAccountSettings(account);
     accounts.push(account);
   });
+  stateEpoch += 1;
 }
 
 let serverSyncAvailable = false;
+let serverHydrated = false;
 let syncOfflineNotified = false;
+let stateEpoch = 0;
+let syncPromise = null;
 
 async function syncAccountsFromServer({ notify = false } = {}) {
-  const wasOnline = serverSyncAvailable;
+  if (syncPromise) return syncPromise;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await fetch(ACCOUNTS_API, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const parsed = await response.json();
-      if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
-      replaceAccounts(parsed.map(cloneAccount));
-      saveAccounts(accounts);
-      serverSyncAvailable = true;
-      rebindCurrentAccount();
-      if (notify && !wasOnline && syncOfflineNotified) {
-        showSuccess(msg('syncRestored'));
+  const job = (async () => {
+    const wasOnline = serverSyncAvailable;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(ACCOUNTS_API, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const parsed = await response.json();
+        if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
+        adoptAccounts(parsed.map(cloneAccount));
+        saveAccounts(accounts);
+        serverSyncAvailable = true;
+        serverHydrated = true;
+        rebindCurrentAccount();
+        if (notify && !wasOnline && syncOfflineNotified) {
+          showSuccess(msg('syncRestored'));
+        }
+        syncOfflineNotified = false;
+        return true;
+      } catch (error) {
+        if (attempt === 0) {
+          await new Promise(resolve => setTimeout(resolve, 600));
+          continue;
+        }
+        serverSyncAvailable = false;
+        if (!serverHydrated) adoptAccounts(loadAccounts().map(cloneAccount));
+        rebindCurrentAccount();
+        console.warn('Synchronisation serveur indisponible, cache local utilisé.', error);
+        if (notify && !syncOfflineNotified) {
+          showInfo(msg('syncOffline'));
+          syncOfflineNotified = true;
+        }
+        return false;
       }
-      syncOfflineNotified = false;
-      return true;
-    } catch (error) {
-      if (attempt === 0) {
-        await new Promise(resolve => setTimeout(resolve, 600));
-        continue;
-      }
-      serverSyncAvailable = false;
-      replaceAccounts(loadAccounts());
-      rebindCurrentAccount();
-      console.warn('Synchronisation serveur indisponible, cache local utilisé.', error);
-      if (notify && !syncOfflineNotified) {
-        showInfo(msg('syncOffline'));
-        syncOfflineNotified = true;
-      }
-      return false;
     }
+    return false;
+  })();
+
+  syncPromise = job;
+  try {
+    return await job;
+  } finally {
+    if (syncPromise === job) syncPromise = null;
   }
-  return false;
 }
 
 function rebindCurrentAccount() {
@@ -1327,19 +1342,62 @@ const adminTransferLabel = document.getElementById('adminTransferLabel');
 const adminTransferDirection = document.getElementById('adminTransferDirection');
 
 async function persistAccounts() {
-  saveAccounts(accounts);
-  if (!serverSyncAvailable) return;
+  const epoch = stateEpoch;
+  if (syncPromise) await syncPromise;
+  if (stateEpoch !== epoch) return false;
 
+  if (!serverHydrated) {
+    const synced = await syncAccountsFromServer();
+    if (!synced) {
+      saveAccounts(accounts);
+      showError(msg('syncSaveLocal'));
+      return false;
+    }
+    return false;
+  }
+
+  const payload = accounts.map(cloneAccount);
   try {
     const response = await fetch(ACCOUNTS_API, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(accounts),
+      body: JSON.stringify(payload),
     });
+    if (response.status === 400 || response.status === 409) {
+      let message = 'Écriture refusée : le solde ne correspond pas aux mouvements.';
+      try {
+        const body = await response.json();
+        if (body?.error) message = body.error;
+      } catch {
+        /* ignore */
+      }
+      showError(message);
+      await syncAccountsFromServer();
+      if (currentAccount) updateUI(currentAccount);
+      if (adminUserList && adminSelectUser) {
+        if (adminSelectUser.value) refreshAdminAccount(adminSelectUser.value);
+        else renderAdminUserList();
+      }
+      return false;
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const body = await response.json().catch(() => ({}));
+    serverSyncAvailable = true;
+    if (stateEpoch === epoch && Array.isArray(body.accounts) && body.accounts.length) {
+      adoptAccounts(body.accounts.map(cloneAccount));
+      rebindCurrentAccount();
+      saveAccounts(accounts);
+    } else {
+      saveAccounts(payload);
+    }
+    return true;
   } catch (error) {
+    serverSyncAvailable = false;
+    saveAccounts(payload);
     console.warn('Impossible de synchroniser les comptes sur le serveur.', error);
     showError(msg('syncSaveLocal'));
+    return false;
   }
 }
 
@@ -1887,7 +1945,8 @@ async function deleteAdminAccount(username) {
   if (adminCreatedEmail && adminCreatedEmail.textContent === username && adminCreatedCredentials) {
     adminCreatedCredentials.classList.add('hidden');
   }
-  await persistAccounts();
+  const saved = await persistAccounts();
+  if (!saved) return;
 
   const stillSelected = adminSelectUser && adminSelectUser.value === username;
   renderAdminUserList();
@@ -2396,14 +2455,13 @@ adminEditForm.addEventListener('submit', async e => {
     if (newPin) account.pin = newPin;
     if (adminEditPin) adminEditPin.value = '';
     const { changed } = syncStatementToBalance(account, newBalance);
-    account.statementBalance = roundAmount(getAccountBalance(account));
-    await persistAccounts();
+    const finalBalance = rememberAccountBalance(account);
+    const saved = await persistAccounts();
+    if (!saved) return;
 
     refreshAdminAccount(username);
 
     if (currentAccount?.username === username) updateUI(currentAccount);
-
-    const finalBalance = getAccountBalance(account);
     const pinMsg = newPin ? ' — mot de passe mis à jour' : '';
     showSuccess(
       `Compte mis à jour : ${newName} — solde ${formatCurrency(finalBalance, account.locale, account.currency)}${pinMsg}` +
@@ -2440,7 +2498,8 @@ if (adminCreateForm) {
       account.movementLabels = [];
       rememberAccountBalance(account);
       accounts.push(account);
-      await persistAccounts();
+      const saved = await persistAccounts();
+      if (!saved) return;
       adminCreateName.value = '';
       showCreatedCredentials(username, pin);
       refreshAdminAccount(username);
@@ -2462,7 +2521,8 @@ async function removeAdminTransfer(username, index) {
   account.movementDates.splice(index, 1);
   account.movementLabels.splice(index, 1);
   const balance = rememberAccountBalance(account);
-  await persistAccounts();
+  const saved = await persistAccounts();
+  if (!saved) return;
   refreshAdminAccount(username);
   showSuccess(
     `Virement retiré. Solde : ${formatCurrency(balance, account.locale, account.currency)} (${formatCurrency(removed, account.locale, account.currency)})`
@@ -2497,7 +2557,8 @@ if (adminTransferForm) {
       const signed = direction === 'out' ? -amount : amount;
       pushMovement(account, signed, label);
       const balance = rememberAccountBalance(account);
-      await persistAccounts();
+      const saved = await persistAccounts();
+      if (!saved) return;
       adminTransferAmount.value = '';
       adminTransferLabel.value = '';
       adminTransferDirection.value = 'in';
@@ -2716,18 +2777,20 @@ closeProductForm.addEventListener('submit', e => {
   renderAccountProducts(currentAccount);
 });
 
-investForm.addEventListener('submit', e => {
+investForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!currentAccount) return;
   const amount = Number(investAmount.value);
   const product = document.getElementById('investProduct').value;
   if (amount > 0 && currentAccount.balance >= amount) {
     currentAccount.investments.push({ product, amount, date: new Date().toISOString().slice(0, 10) });
-    currentAccount.movements.push(-amount);
+    currentAccount.movements.push(roundAmount(-amount));
     ensureMovementLabels(currentAccount);
     assignDateToNewMovement(currentAccount);
+    rememberAccountBalance(currentAccount);
     investAmount.value = '';
-    persistAccounts();
+    const saved = await persistAccounts();
+    if (!saved) return;
     renderInvestments(currentAccount);
     updateUI(currentAccount);
     showSuccess(msg('investmentDone'));
