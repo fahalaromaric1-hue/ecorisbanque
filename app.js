@@ -2503,33 +2503,33 @@ loginForm.addEventListener('submit', async e => {
   e.preventDefault();
   const username = inputUsername.value.trim().toLowerCase();
   const pin = inputPin.value;
-  if (!serverHydrated) await syncAccountsFromServer();
+  const synced = await syncAccountsFromServer();
 
   if (isAdminLogin(username, pin)) {
-      showAdminPanel();
-      saveSession(username, pin, 'admin');
-      showSuccess(msg('adminLoginSuccess'));
-      inputUsername.value = inputPin.value = '';
-      return;
-    }
+    showAdminPanel();
+    saveSession(username, pin, 'admin');
+    showSuccess(msg('adminLoginSuccess'));
+    inputUsername.value = inputPin.value = '';
+    return;
+  }
 
-    currentAccount = accounts.find(acc => acc.username === username);
-    if (currentAccount?.pin === pin) {
-      hideAdminPanel();
-      containerLogin.classList.add('hidden');
-      showClientControls();
-      updateClientDisplay(currentAccount);
-      displayDate(currentAccount.locale);
-      applyUiLocale(currentAccount.locale);
-      saveSession(username, pin, 'user');
-      inputUsername.value = inputPin.value = '';
-      showSuccess(msg('loginSuccess'));
-      const target = pendingView || 'dashboard';
-      pendingView = null;
-      showView(target);
-    } else {
-      showError(msg('loginFailed'));
-    }
+  currentAccount = accounts.find(acc => String(acc.username).trim().toLowerCase() === username);
+  if (currentAccount && String(currentAccount.pin) === String(pin)) {
+    hideAdminPanel();
+    containerLogin.classList.add('hidden');
+    showClientControls();
+    updateClientDisplay(currentAccount);
+    displayDate(currentAccount.locale);
+    applyUiLocale(currentAccount.locale);
+    saveSession(username, pin, 'user');
+    inputUsername.value = inputPin.value = '';
+    showSuccess(msg('loginSuccess'));
+    const target = pendingView || 'dashboard';
+    pendingView = null;
+    showView(target);
+  } else {
+    showError(synced ? msg('loginFailed') : msg('syncOffline'));
+  }
 });
 
 adminEditForm.addEventListener('submit', async e => {
