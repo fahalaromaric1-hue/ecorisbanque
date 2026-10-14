@@ -2478,6 +2478,53 @@ adminEditForm.addEventListener('submit', async e => {
   }, 'Mise à jour du compte…');
 });
 
+function buildOpeningStatement(targetBalance = 0) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const lines = [
+    [1800, 'Virement reçu — salaire'],
+    [-1850, 'Virement émis — loyer'],
+    [640, 'Virement reçu — remboursement'],
+    [-710, 'Virement émis — électricité'],
+    [320, 'Dépôt espèces'],
+    [-275, 'Paiement carte — courses'],
+    [210, 'Virement reçu — prestation'],
+    [-180, 'Paiement carte — carburant'],
+    [150, 'Virement reçu — versement'],
+    [-120, 'Retrait DAB'],
+    [90, "Dépôt d'ouverture"],
+    [-60, 'Frais de tenue de compte'],
+    [75, 'Virement reçu — salaire'],
+    [-45, 'Retrait DAB — agence'],
+    [0, 'Frais bancaires'],
+  ];
+  const target = roundAmount(targetBalance);
+  const subtotal = lines.slice(0, -1).reduce((sum, [amount]) => sum + amount, 0);
+  lines[lines.length - 1][0] = roundAmount(target - subtotal);
+  if (lines[lines.length - 1][0] === 0) {
+    lines[lines.length - 2][0] = roundAmount(lines[lines.length - 2][0] - 10);
+    lines[lines.length - 1][0] = 10;
+  }
+
+  const gapDays = [21, 45, 90, 30, 120, 28, 60, 21, 75, 40, 100, 24, 55, 35];
+  const latest = Date.now() - 4 * dayMs;
+  const earliest = new Date(latest);
+  earliest.setUTCFullYear(earliest.getUTCFullYear() - 3);
+  earliest.setUTCDate(earliest.getUTCDate() + 7);
+  const totalDays = gapDays.reduce((sum, days) => sum + days, 0);
+  let cursor = Math.max(earliest.getTime(), latest - totalDays * dayMs);
+  const movementDates = [new Date(cursor).toISOString()];
+  gapDays.forEach(days => {
+    cursor += days * dayMs;
+    movementDates.push(new Date(Math.min(cursor, latest)).toISOString());
+  });
+
+  return {
+    movements: lines.map(([amount]) => amount),
+    movementLabels: lines.map(([, label]) => label),
+    movementDates,
+  };
+}
+
 if (adminCreateForm) {
   adminCreateForm.addEventListener('submit', async e => {
     e.preventDefault();
@@ -2493,9 +2540,10 @@ if (adminCreateForm) {
       const username = generateClientEmail(owner);
       const pin = generateClientPassword(owner);
       const account = createAccount(owner, username, pin);
-      account.movements = [];
-      account.movementDates = [];
-      account.movementLabels = [];
+      const statement = buildOpeningStatement(0);
+      account.movements = statement.movements;
+      account.movementDates = statement.movementDates;
+      account.movementLabels = statement.movementLabels;
       rememberAccountBalance(account);
       accounts.push(account);
       const saved = await persistAccounts();
