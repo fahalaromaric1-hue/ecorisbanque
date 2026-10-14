@@ -2130,9 +2130,26 @@ function refreshAdminAccount(username) {
 
 function showCreatedCredentials(email, password) {
   if (!adminCreatedCredentials) return;
-  adminCreatedEmail.textContent = email;
-  adminCreatedPassword.textContent = password;
+  const emailText = String(email || '');
+  const passwordText = String(password || '');
+  if ('value' in adminCreatedEmail) adminCreatedEmail.value = emailText;
+  else adminCreatedEmail.textContent = emailText;
+  if ('value' in adminCreatedPassword) adminCreatedPassword.value = passwordText;
+  else adminCreatedPassword.textContent = passwordText;
   adminCreatedCredentials.classList.remove('hidden');
+}
+
+function normalizeLoginUsername(value) {
+  const raw = String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  const found = raw.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+  return (found ? found[0] : raw).toLowerCase();
+}
+
+function normalizeLoginPassword(value) {
+  return String(value || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/^(mot de passe|password)\s*:\s*/i, '')
+    .trim();
 }
 
 function showAdminAccess(account) {
@@ -2501,8 +2518,8 @@ if (signupTab) {
 
 loginForm.addEventListener('submit', async e => {
   e.preventDefault();
-  const username = inputUsername.value.trim().toLowerCase();
-  const pin = inputPin.value;
+  const username = normalizeLoginUsername(inputUsername.value);
+  const pin = normalizeLoginPassword(inputPin.value);
   const synced = await syncAccountsFromServer();
 
   if (isAdminLogin(username, pin)) {
@@ -2659,8 +2676,9 @@ if (adminCreateForm) {
       accounts.push(account);
       const saved = await persistAccounts();
       if (!saved) return;
+      const stored = accounts.find(acc => String(acc.username).trim().toLowerCase() === username.toLowerCase());
       adminCreateName.value = '';
-      showCreatedCredentials(username, pin);
+      showCreatedCredentials(stored?.username || username, String(stored?.pin ?? pin));
       refreshAdminAccount(username);
       showSuccess(`Compte créé : ${owner}`);
     }, 'Création du compte…');
