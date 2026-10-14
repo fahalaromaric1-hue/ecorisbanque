@@ -546,51 +546,61 @@ function refreshSharedAccountViews() {
   refreshAdminAccount(selected);
 }
 
+async function fetchServerAccounts() {
+  const response = await fetch(`${ACCOUNTS_API}?t=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const parsed = await response.json();
+  const list = Array.isArray(parsed) ? parsed : parsed?.accounts;
+  if (!Array.isArray(list) || !list.length) throw new Error('Données invalides');
+  return { accounts: list, revision: revisionFromResponse(response) };
+}
+
+function applyServerAccounts(list, revision) {
+  if (serverHydrated && revision !== null && revision === serverRevision) return false;
+  adoptAccounts(list.map(cloneAccount));
+  rememberServerRevision(revision);
+  captureServerSnapshot();
+  saveAccounts(accounts);
+  serverSyncAvailable = true;
+  serverHydrated = true;
+  try {
+    refreshSharedAccountViews();
+  } catch (error) {
+    console.warn('Affichage non rafraîchi.', error);
+  }
+  return true;
+}
+
 async function syncAccountsFromServer({ notify = false } = {}) {
   if (syncPromise) return syncPromise;
 
   const job = (async () => {
     const wasOnline = serverSyncAvailable;
+    let lastError = null;
 
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const response = await fetch(ACCOUNTS_API, { cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const parsed = await response.json();
-        if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
-        const revision = revisionFromResponse(response);
-        if (serverHydrated && revision !== null && revision === serverRevision) {
-          serverSyncAvailable = true;
-          syncOfflineNotified = false;
-          return true;
-        }
-        adoptAccounts(parsed.map(cloneAccount));
-        rememberServerRevision(revision);
-        captureServerSnapshot();
-        saveAccounts(accounts);
-        serverSyncAvailable = true;
-        serverHydrated = true;
-        refreshSharedAccountViews();
-        if (notify && !wasOnline && syncOfflineNotified) {
-          showSuccess(msg('syncRestored'));
-        }
+        const fresh = await fetchServerAccounts();
+        applyServerAccounts(fresh.accounts, fresh.revision);
+        if (notify && !wasOnline && syncOfflineNotified) showSuccess(msg('syncRestored'));
         syncOfflineNotified = false;
         return true;
       } catch (error) {
-        if (attempt === 0) {
-          await new Promise(resolve => setTimeout(resolve, 600));
+        lastError = error;
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 400));
           continue;
         }
-        serverSyncAvailable = false;
-        if (!serverHydrated) adoptAccounts(loadAccounts().map(cloneAccount));
-        rebindCurrentAccount();
-        console.warn('Synchronisation serveur indisponible, cache local utilisé.', error);
-        if (notify && !syncOfflineNotified) {
-          showInfo(msg('syncOffline'));
-          syncOfflineNotified = true;
-        }
-        return false;
       }
+    }
+
+    serverSyncAvailable = false;
+    if (!serverHydrated) adoptAccounts(loadAccounts().map(cloneAccount));
+    rebindCurrentAccount();
+    console.warn('Synchronisation serveur indisponible, cache local utilisé.', lastError);
+    if (notify && !syncOfflineNotified) {
+      showInfo(msg('syncOffline'));
+      syncOfflineNotified = true;
     }
     return false;
   })();
@@ -2520,7 +2530,15 @@ loginForm.addEventListener('submit', async e => {
   e.preventDefault();
   const username = normalizeLoginUsername(inputUsername.value);
   const pin = normalizeLoginPassword(inputPin.value);
-  const synced = await syncAccountsFromServer();
+  let fresh = null;
+  try {
+    fresh = await fetchServerAccounts();
+    applyServerAccounts(fresh.accounts, fresh.revision);
+  } catch (error) {
+    console.warn('Lecture du serveur avant connexion impossible.', error);
+    showError(msg('syncOffline'));
+    return;
+  }
 
   if (isAdminLogin(username, pin)) {
     showAdminPanel();
@@ -2545,7 +2563,7 @@ loginForm.addEventListener('submit', async e => {
     pendingView = null;
     showView(target);
   } else {
-    showError(synced ? msg('loginFailed') : msg('syncOffline'));
+    showError(msg('loginFailed'));
   }
 });
 
@@ -3215,7 +3233,7 @@ async function initApp() {
   bindBankingInputs();
   populateLocaleOptions();
   populateCurrencyOptions();
-  await syncAccountsFromServer({ notify: true });
+  await syncAccountsFromServer();
 
   tryAutoLogin();
   rebindCurrentAccount();
