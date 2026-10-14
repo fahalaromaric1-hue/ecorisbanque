@@ -720,79 +720,87 @@ const movementDatesOutOfNorm = account => {
   });
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const STATEMENT_RETENTION_YEARS = 3;
-const MONTHLY_GAP_DAYS = [21, 45, 90, 30, 120, 28, 60, 18, 75, 40, 100, 24, 55, 35, 80, 16];
-
-const statementConsultCutoff = () => {
-  const limit = new Date();
-  limit.setHours(0, 0, 0, 0);
-  limit.setFullYear(limit.getFullYear() - STATEMENT_RETENTION_YEARS);
-  return limit.getTime();
-};
-
-const isMovementConsultable = date => {
-  const time = new Date(date).getTime();
-  return !Number.isNaN(time) && time >= statementConsultCutoff();
-};
-
-const movementDatesSpanMonths = account => {
-  const dates = account.movementDates;
-  const count = account.movements.length;
-  if (!Array.isArray(dates) || dates.length !== count || count === 0) return false;
-  const times = dates.map(date => new Date(date).getTime());
-  if (times.some(time => Number.isNaN(time))) return false;
-  for (let i = 1; i < times.length; i++) {
-    if (times[i] - times[i - 1] < DAY_MS) return false;
-  }
-  if (count === 1) return true;
-  return times[times.length - 1] - times[0] >= 90 * DAY_MS;
-};
-
-const variedMovementDates = count => {
-  if (count <= 0) return [];
-  const end = Date.now() - 5 * DAY_MS;
-  const start = statementConsultCutoff() + 10 * DAY_MS;
-  if (count === 1) return [new Date(Math.round((start + end) / 2)).toISOString()];
-  const weights = Array.from({ length: count - 1 }, (_, index) => MONTHLY_GAP_DAYS[index % MONTHLY_GAP_DAYS.length]);
-  const weightSum = weights.reduce((sum, weight) => sum + weight, 0);
-  const span = Math.max(end - start, (count - 1) * 14 * DAY_MS);
-  let cursor = end - span;
-  const dates = [new Date(cursor).toISOString()];
-  weights.forEach((weight, index) => {
-    const gap =
-      index === weights.length - 1
-        ? end - cursor
-        : Math.max(14 * DAY_MS, Math.round((span * weight) / weightSum));
-    cursor += gap;
-    dates.push(new Date(index === weights.length - 1 ? end : cursor).toISOString());
-  });
-  return dates;
-};
-
 const assignDateToNewMovement = account => {
-  const index = account.movements.length - 1;
-  if (index < 0) return;
+  const idx = account.movements.length - 1;
+  if (idx < 0) return;
+
   ensureMovementDatesLength(account);
-  const previous = index > 0 ? new Date(account.movementDates[index - 1]).getTime() : NaN;
-  if (Number.isNaN(previous)) {
-    regularizeMovementHistory(account);
-    return;
+  const { earliest, latest } = getHistoryBounds();
+  const minGapMs = getMinGapMs();
+
+  const previousTimes = account.movementDates
+    .slice(0, idx)
+    .map(d => new Date(d).getTime())
+    .filter(t => !Number.isNaN(t));
+
+  const lastTime = previousTimes.length ? Math.max(...previousTimes) : earliest;
+  const candidate = advanceMovementCursor(lastTime);
+  let nextDate;
+
+  if (candidate <= latest) {
+    nextDate = clampMovementDate(candidate, idx);
+  } else {
+    const d = jitterClock(latest, idx);
+    if (previousTimes.length) {
+      const prevMs = Math.max(...previousTimes);
+      if (d.getTime() - prevMs < minGapMs) {
+        d.setTime(Math.min(latest, prevMs + minGapMs));
+      }
+    }
+    nextDate = clampMovementDate(d.getTime(), idx);
   }
-  const gapDays = MONTHLY_GAP_DAYS[index % MONTHLY_GAP_DAYS.length];
-  const next = previous + gapDays * DAY_MS;
-  const latest = Date.now() - 60 * 60 * 1000;
-  account.movementDates[index] = new Date(Math.max(previous + DAY_MS, Math.min(next, latest))).toISOString();
+
+  account.movementDates[idx] = nextDate.toISOString();
+
+  if (
+    movementDatesOutOfNorm(account) ||
+    (account.movements.length > 1 && historySpanMs(account) < getMinSpanMs())
+  ) {
+    regularizeMovementHistory(account);
+  }
 };
 
 const regularizeMovementHistory = account => {
   const count = account.movements.length;
+  ensureMovementDatesLength(account);
+
   if (count === 0) {
     account.movementDates = [];
     return;
   }
-  if (movementDatesSpanMonths(account)) return;
-  account.movementDates = variedMovementDates(count);
+
+  const { earliest, latest } = getHistoryBounds();
+  const minSpanMs = getMinSpanMs();
+  const minGapMs = getMinGapMs();
+  const dates = [];
+  let cursor = earliest;
+
+  for (let i = 0; i < count; i++) {
+    if (i > 0) cursor = advanceMovementCursor(dates[i - 1].getTime());
+
+    const slotLatest = latest - (count - 1 - i) * minGapMs;
+    if (cursor > slotLatest) {
+      cursor = slotLatest - Math.floor(Math.random() * 4) * 60 * 60 * 1000;
+    }
+
+    dates.push(clampMovementDate(cursor, i));
+    cursor = dates[i].getTime();
+  }
+
+  if (count > 1 && dates[count - 1].getTime() - dates[0].getTime() < minSpanMs) {
+    const start = earliest;
+    const step = minSpanMs / (count - 1);
+    for (let i = 0; i < count; i++) {
+      const t = Math.min(latest - (count - 1 - i) * minGapMs, start + step * i);
+      dates[i] = clampMovementDate(t, i);
+    }
+  }
+
+  if (count === 1) {
+    dates[0] = clampMovementDate((earliest + latest) / 2, 0);
+  }
+
+  account.movementDates = dates.map(d => d.toISOString());
 };
 
 const isAdminAdjustmentLabel = label =>
@@ -1181,8 +1189,7 @@ function exportStatement(account) {
     year: 'numeric',
   });
 
-  const visibleLines = lines.filter(line => isMovementConsultable(line.date));
-  const rows = visibleLines
+  const rows = lines
     .map((line, i) => {
       const label = getMovementLabel(line, loc);
       return `
@@ -1215,7 +1222,7 @@ function exportStatement(account) {
 </head>
 <body>
   <h1>Ecorise Banque</h1>
-  <p class="meta">${t('exportTitle', loc)} — ${account.owner} (${account.username})<br/>${t('exportEdited', loc)} ${now}<br/>Les opérations de plus de 3 ans ne sont pas consultables.</p>
+  <p class="meta">${t('exportTitle', loc)} — ${account.owner} (${account.username})<br/>${t('exportEdited', loc)} ${now}</p>
   <table>
     <thead>
       <tr><th>${t('exportColNum', loc)}</th><th>${t('exportColDate', loc)}</th><th>${t('exportColOperation', loc)}</th><th>${t('exportColAmount', loc)}</th></tr>
@@ -1508,24 +1515,10 @@ function updateActiveFilter(type) {
   });
 }
 
-function consultableStatementLines(account) {
-  return buildStatementLines(account).filter(line => isMovementConsultable(line.date));
-}
-
-function updateStatementLimitNote(account) {
-  const note = document.getElementById('statementLimitNote');
-  if (!note) return;
-  const hidden = buildStatementLines(account).filter(line => !isMovementConsultable(line.date)).length;
-  note.textContent = hidden
-    ? `Les opérations de plus de 3 ans ne sont pas consultables (${hidden} masquée${hidden > 1 ? 's' : ''}).`
-    : 'Les opérations de plus de 3 ans ne sont pas consultables.';
-}
-
 function displayMovements(account, sort = false, filterType = 'all', searchQuery = '') {
   containerMovements.innerHTML = '';
-  updateStatementLimitNote(account);
 
-  let lines = filterStatementLines(consultableStatementLines(account), {
+  let lines = filterStatementLines(buildStatementLines(account), {
     filterType,
     searchQuery,
   });
@@ -1586,26 +1579,20 @@ function displayMovements(account, sort = false, filterType = 'all', searchQuery
 function updateMovementsToggle(total, shown, sort) {
   if (!btnShowMoreMovements) return;
 
-  const previewing =
-    isMobileView() && !movementsExpanded && total > MOBILE_PREVIEW_MOVEMENTS && shown < total;
+  const onMobile = isMobileView();
+  const hasMore = total > MOBILE_PREVIEW_MOVEMENTS;
 
-  if (sort || movementSearch.trim() || total === 0) {
+  if (!onMobile || !hasMore || sort || movementSearch.trim()) {
     btnShowMoreMovements.classList.add('hidden');
-    btnShowMoreMovements.classList.remove('is-loading');
     return;
   }
 
-  btnShowMoreMovements.classList.remove('hidden', 'is-loading');
-  btnShowMoreMovements.disabled = false;
-  if (previewing) {
-    btnShowMoreMovements.dataset.mode = 'expand';
-    btnShowMoreMovements.textContent =
-      total - shown > 1 ? msg('showMoreOps', { n: total - shown }) : msg('showMoreOne');
-    return;
-  }
-
-  btnShowMoreMovements.dataset.mode = 'limit';
-  btnShowMoreMovements.textContent = 'Montrer plus';
+  btnShowMoreMovements.classList.remove('hidden');
+  btnShowMoreMovements.textContent = movementsExpanded
+    ? msg('showLess')
+    : total - shown > 1
+      ? msg('showMoreOps', { n: total - shown })
+      : msg('showMoreOne');
 }
 
 function renderStatementFooter(account) {
@@ -1716,13 +1703,11 @@ function renderSpendingChart(account) {
       value: mov,
       amount: Math.abs(mov),
       type: mov > 0 ? 'deposit' : 'withdrawal',
-      date: account.movementDates[i],
       label: new Date(account.movementDates[i]).toLocaleDateString(account.locale, {
         day: '2-digit',
         month: 'short',
       }),
     }))
-    .filter(point => isMovementConsultable(point.date))
     .slice(-6);
 
   if (!chartData.length) {
@@ -2521,30 +2506,30 @@ loginForm.addEventListener('submit', async e => {
   if (!serverHydrated) await syncAccountsFromServer();
 
   if (isAdminLogin(username, pin)) {
-    showAdminPanel();
-    saveSession(username, pin, 'admin');
-    showSuccess(msg('adminLoginSuccess'));
-    inputUsername.value = inputPin.value = '';
-    return;
-  }
+      showAdminPanel();
+      saveSession(username, pin, 'admin');
+      showSuccess(msg('adminLoginSuccess'));
+      inputUsername.value = inputPin.value = '';
+      return;
+    }
 
-  currentAccount = accounts.find(acc => acc.username === username);
-  if (currentAccount?.pin === pin) {
-    hideAdminPanel();
-    containerLogin.classList.add('hidden');
-    showClientControls();
-    updateClientDisplay(currentAccount);
-    displayDate(currentAccount.locale);
-    applyUiLocale(currentAccount.locale);
-    saveSession(username, pin, 'user');
-    inputUsername.value = inputPin.value = '';
-    showSuccess(msg('loginSuccess'));
-    const target = pendingView || 'dashboard';
-    pendingView = null;
-    showView(target);
-  } else {
-    showError(msg('loginFailed'));
-  }
+    currentAccount = accounts.find(acc => acc.username === username);
+    if (currentAccount?.pin === pin) {
+      hideAdminPanel();
+      containerLogin.classList.add('hidden');
+      showClientControls();
+      updateClientDisplay(currentAccount);
+      displayDate(currentAccount.locale);
+      applyUiLocale(currentAccount.locale);
+      saveSession(username, pin, 'user');
+      inputUsername.value = inputPin.value = '';
+      showSuccess(msg('loginSuccess'));
+      const target = pendingView || 'dashboard';
+      pendingView = null;
+      showView(target);
+    } else {
+      showError(msg('loginFailed'));
+    }
 });
 
 adminEditForm.addEventListener('submit', async e => {
@@ -3138,25 +3123,9 @@ btnSort.addEventListener('click', () => {
 });
 
 if (btnShowMoreMovements) {
-  btnShowMoreMovements.addEventListener('click', async () => {
-    if (btnShowMoreMovements.dataset.mode === 'expand') {
-      movementsExpanded = true;
-      if (currentAccount) updateUI(currentAccount);
-      return;
-    }
-    if (btnShowMoreMovements.classList.contains('is-loading')) return;
-
-    btnShowMoreMovements.classList.add('is-loading');
-    btnShowMoreMovements.disabled = true;
-    btnShowMoreMovements.textContent = 'Chargement…';
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    btnShowMoreMovements.classList.remove('is-loading');
-    btnShowMoreMovements.disabled = false;
-    btnShowMoreMovements.textContent = 'Montrer plus';
-    const note = document.getElementById('statementLimitNote');
-    if (note) {
-      note.textContent = 'Chargement interrompu. Les opérations de plus de 3 ans ne sont pas consultables.';
-    }
+  btnShowMoreMovements.addEventListener('click', () => {
+    movementsExpanded = !movementsExpanded;
+    if (currentAccount) updateUI(currentAccount);
   });
 }
 
