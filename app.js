@@ -845,11 +845,8 @@ async function initUiLocale() {
   applyUiLocale(visitorLocale);
 }
 
-const DEMO_DISMISS_KEY = 'ecorisDemoDismissed';
-
 function applyUiLocale(locale = getActiveLocale()) {
   const safe = applyPageI18n(locale);
-  updateDemoBanner();
   if (labelWelcome) {
     if (isAdminSession) {
       labelWelcome.textContent = t('adminWelcome', safe);
@@ -1510,25 +1507,6 @@ function resetClientDisplay() {
   if (sidebarClientGreeting) {
     sidebarClientGreeting.textContent = t('clientArea', getActiveLocale());
   }
-}
-
-function updateDemoBanner() {
-  const banner = document.getElementById('demoBanner');
-  if (!banner) return;
-  const show =
-    !!currentAccount &&
-    !isAdminSession &&
-    !sessionStorage.getItem(DEMO_DISMISS_KEY);
-  banner.classList.toggle('hidden', !show);
-}
-
-function dismissDemoBanner() {
-  try {
-    sessionStorage.setItem(DEMO_DISMISS_KEY, '1');
-  } catch {
-    /* ignore */
-  }
-  updateDemoBanner();
 }
 
 function updateUI(account) {
@@ -3027,11 +3005,6 @@ async function initApp() {
   }
 
   updateLoginViewState();
-}
-
-const demoBannerDismiss = document.getElementById('demoBannerDismiss');
-if (demoBannerDismiss) {
-  demoBannerDismiss.addEventListener('click', dismissDemoBanner);
 }
 
 initApp();
