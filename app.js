@@ -2497,11 +2497,9 @@ loginForm.addEventListener('submit', async e => {
   e.preventDefault();
   const username = inputUsername.value.trim().toLowerCase();
   const pin = inputPin.value;
+  if (!serverHydrated) await syncAccountsFromServer();
 
-  await withLoader(async () => {
-    await syncAccountsFromServer();
-
-    if (isAdminLogin(username, pin)) {
+  if (isAdminLogin(username, pin)) {
       showAdminPanel();
       saveSession(username, pin, 'admin');
       showSuccess(msg('adminLoginSuccess'));
@@ -2526,7 +2524,6 @@ loginForm.addEventListener('submit', async e => {
     } else {
       showError(msg('loginFailed'));
     }
-  }, msg('signingIn'));
 });
 
 adminEditForm.addEventListener('submit', async e => {
