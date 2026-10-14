@@ -508,6 +508,43 @@ let serverHydrated = false;
 let syncOfflineNotified = false;
 let stateEpoch = 0;
 let syncPromise = null;
+let serverRevision = null;
+let serverSnapshot = [];
+
+const ACCOUNTS_SYNC_MS = 4000;
+
+function revisionFromResponse(response) {
+  const raw = response.headers.get('X-Accounts-Revision');
+  if (raw == null || raw === '') return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function rememberServerRevision(revision) {
+  if (Number.isInteger(revision) && revision >= 0) serverRevision = revision;
+}
+
+function refreshSharedAccountViews() {
+  rebindCurrentAccount();
+  if (currentAccount) updateUI(currentAccount);
+  if (!isAdminSession || !adminUserList) return;
+
+  const selected = adminSelectUser?.value || '';
+  const active = document.activeElement;
+  const editing = Boolean(
+    active &&
+      (adminEditForm?.contains(active) ||
+        adminCreateForm?.contains(active) ||
+        adminTransferForm?.contains(active))
+  );
+  renderAdminUserList();
+  if (!selected) return;
+  if (editing) {
+    if (adminSelectUser) adminSelectUser.value = selected;
+    return;
+  }
+  refreshAdminAccount(selected);
+}
 
 async function syncAccountsFromServer({ notify = false } = {}) {
   if (syncPromise) return syncPromise;
@@ -521,11 +558,19 @@ async function syncAccountsFromServer({ notify = false } = {}) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const parsed = await response.json();
         if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
+        const revision = revisionFromResponse(response);
+        if (serverHydrated && revision !== null && revision === serverRevision) {
+          serverSyncAvailable = true;
+          syncOfflineNotified = false;
+          return true;
+        }
         adoptAccounts(parsed.map(cloneAccount));
+        rememberServerRevision(revision);
+        captureServerSnapshot();
         saveAccounts(accounts);
         serverSyncAvailable = true;
         serverHydrated = true;
-        rebindCurrentAccount();
+        refreshSharedAccountViews();
         if (notify && !wasOnline && syncOfflineNotified) {
           showSuccess(msg('syncRestored'));
         }
@@ -1341,64 +1386,127 @@ const adminTransferAmount = document.getElementById('adminTransferAmount');
 const adminTransferLabel = document.getElementById('adminTransferLabel');
 const adminTransferDirection = document.getElementById('adminTransferDirection');
 
-async function persistAccounts() {
-  const epoch = stateEpoch;
-  if (syncPromise) await syncPromise;
-  if (stateEpoch !== epoch) return false;
+function captureServerSnapshot() {
+  serverSnapshot = accounts.map(cloneAccount);
+}
 
-  if (!serverHydrated) {
+function accountKey(account) {
+  return String(account?.username || '').trim().toLowerCase();
+}
+
+function diffAccounts(base, current) {
+  const baseMap = new Map((base || []).map(account => [accountKey(account), account]));
+  const currentMap = new Map((current || []).map(account => [accountKey(account), account]));
+  const changed = [];
+  const removed = [];
+  for (const [key, account] of currentMap) {
+    const previous = baseMap.get(key);
+    if (!previous || JSON.stringify(previous) !== JSON.stringify(account)) changed.push(cloneAccount(account));
+  }
+  for (const key of baseMap.keys()) {
+    if (!currentMap.has(key)) removed.push(key);
+  }
+  return { changed, removed };
+}
+
+function applyAccountDelta(freshAccounts, delta) {
+  const next = freshAccounts.map(cloneAccount);
+  for (const key of delta.removed) {
+    const index = next.findIndex(account => accountKey(account) === key);
+    if (index >= 0) next.splice(index, 1);
+  }
+  for (const account of delta.changed) {
+    const key = accountKey(account);
+    const index = next.findIndex(item => accountKey(item) === key);
+    if (index >= 0) next[index] = cloneAccount(account);
+    else next.push(cloneAccount(account));
+  }
+  return next;
+}
+
+async function readServerAccounts() {
+  const response = await fetch(ACCOUNTS_API, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const parsed = await response.json();
+  if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
+  return { accounts: parsed, revision: revisionFromResponse(response) };
+}
+
+async function persistAccounts() {
+  const intended = accounts.map(cloneAccount);
+  const base = serverSnapshot.map(cloneAccount);
+  if (syncPromise) await syncPromise;
+
+  if (!serverHydrated || serverRevision == null) {
     const synced = await syncAccountsFromServer();
     if (!synced) {
-      saveAccounts(accounts);
+      saveAccounts(intended);
       showError(msg('syncSaveLocal'));
       return false;
     }
     return false;
   }
 
-  const payload = accounts.map(cloneAccount);
-  try {
-    const response = await fetch(ACCOUNTS_API, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (response.status === 400 || response.status === 409) {
-      let message = 'Écriture refusée : le solde ne correspond pas aux mouvements.';
-      try {
-        const body = await response.json();
-        if (body?.error) message = body.error;
-      } catch {
-        /* ignore */
-      }
-      showError(message);
-      await syncAccountsFromServer();
-      if (currentAccount) updateUI(currentAccount);
-      if (adminUserList && adminSelectUser) {
-        if (adminSelectUser.value) refreshAdminAccount(adminSelectUser.value);
-        else renderAdminUserList();
-      }
-      return false;
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const delta = diffAccounts(base, intended);
+  if (!delta.changed.length && !delta.removed.length) return true;
 
-    const body = await response.json().catch(() => ({}));
-    serverSyncAvailable = true;
-    if (stateEpoch === epoch && Array.isArray(body.accounts) && body.accounts.length) {
-      adoptAccounts(body.accounts.map(cloneAccount));
-      rebindCurrentAccount();
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const fresh = await readServerAccounts();
+      const merged = applyAccountDelta(fresh.accounts, delta);
+      const response = await fetch(ACCOUNTS_API, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'If-Match': String(fresh.revision),
+        },
+        body: JSON.stringify(merged),
+      });
+      if (response.status === 409) continue;
+      if (response.status === 400 || response.status === 428) {
+        let message = response.status === 400
+          ? 'Écriture refusée : le solde ne correspond pas aux mouvements.'
+          : msg('syncConflict');
+        try {
+          const body = await response.json();
+          if (body?.error) message = body.error;
+        } catch {
+          /* ignore */
+        }
+        showError(message);
+        await syncAccountsFromServer();
+        refreshSharedAccountViews();
+        return false;
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const body = await response.json().catch(() => ({}));
+      serverSyncAvailable = true;
+      if (Array.isArray(body.accounts) && body.accounts.length) {
+        adoptAccounts(body.accounts.map(cloneAccount));
+      } else {
+        adoptAccounts(merged.map(cloneAccount));
+      }
+      rememberServerRevision(
+        Number.isInteger(body.revision) ? body.revision : revisionFromResponse(response)
+      );
+      captureServerSnapshot();
       saveAccounts(accounts);
-    } else {
-      saveAccounts(payload);
+      refreshSharedAccountViews();
+      return true;
     }
-    return true;
   } catch (error) {
     serverSyncAvailable = false;
-    saveAccounts(payload);
+    saveAccounts(intended);
     console.warn('Impossible de synchroniser les comptes sur le serveur.', error);
     showError(msg('syncSaveLocal'));
     return false;
   }
+
+  showError(msg('syncConflict'));
+  await syncAccountsFromServer();
+  refreshSharedAccountViews();
+  return false;
 }
 
 function updateActiveFilter(type) {
@@ -3116,8 +3224,22 @@ async function initApp() {
   }
 
   updateLoginViewState();
+  watchAccountChanges();
 }
 
+function watchAccountChanges() {
+  window.setInterval(() => {
+    if (document.visibilityState === 'hidden') return;
+    if (!isAdminSession && !currentAccount) return;
+    syncAccountsFromServer();
+  }, ACCOUNTS_SYNC_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncAccountsFromServer();
+  });
+  window.addEventListener('focus', () => {
+    syncAccountsFromServer();
+  });
+}
 initApp();
 
 window.addEventListener('hashchange', () => {

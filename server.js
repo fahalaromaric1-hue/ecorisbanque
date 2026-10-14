@@ -17,8 +17,13 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-function sendJson(res, status, payload) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+function sendJson(res, status, payload, extraHeaders) {
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  };
+  if (extraHeaders) Object.assign(headers, extraHeaders);
+  res.writeHead(status, headers);
   res.end(JSON.stringify(payload));
 }
 
@@ -101,7 +106,8 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/api/accounts' && req.method === 'GET') {
     try {
-      sendJson(res, 200, store.loadAccounts());
+      const revision = store.getRevision();
+      sendJson(res, 200, store.loadAccounts(), { 'X-Accounts-Revision': String(revision) });
     } catch (error) {
       sendJson(res, error.status || 500, { error: error.message || 'Erreur serveur' });
     }
@@ -116,12 +122,29 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: 'Données invalides' });
         return;
       }
-      const accounts = store.writeAccounts(parsed);
-      sendJson(res, 200, { ok: true, accounts });
+      const expectedRevision = revisionFromHeader(req.headers['if-match']);
+      if (expectedRevision == null) {
+        sendJson(res, 428, { error: 'Version des données manquante.' });
+        return;
+      }
+      const result = store.writeAccounts(parsed, {
+        checkRevision: true,
+        expectedRevision,
+      });
+      sendJson(res, 200, { ok: true, revision: result.revision, accounts: result.accounts }, {
+        'X-Accounts-Revision': String(result.revision),
+      });
     } catch (error) {
       const status = error instanceof SyntaxError ? 400 : error.status || 500;
       const message = error instanceof SyntaxError ? 'Données invalides' : error.message || 'Erreur serveur';
-      sendJson(res, status, { error: message });
+      const payload = { error: message };
+      const headers = {};
+      if (status === 409) {
+        payload.revision = error.revision;
+        payload.accounts = error.accounts;
+        if (error.revision != null) headers['X-Accounts-Revision'] = String(error.revision);
+      }
+      sendJson(res, status, payload, headers);
     }
     return;
   }
@@ -133,6 +156,13 @@ const server = http.createServer(async (req, res) => {
 
   sendJson(res, 405, { error: 'Méthode non autorisée' });
 });
+
+function revisionFromHeader(value) {
+  if (value == null) return null;
+  const normalized = String(value).trim().replace(/^"|"$/g, '');
+  if (!/^\d+$/.test(normalized)) return null;
+  return Number(normalized);
+}
 
 function start() {
   try {

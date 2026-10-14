@@ -116,6 +116,12 @@ function isSeeded() {
   return Boolean(db.prepare(`SELECT 1 AS ok FROM meta WHERE key = 'seeded'`).get());
 }
 
+function getRevision() {
+  const row = db.prepare(`SELECT value FROM meta WHERE key = 'revision'`).get();
+  const value = Number(row?.value);
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
 function canonicalAccount(account) {
   const movements = account.movements.map(amount => roundAmount(amount));
   const labels = Array.isArray(account.movementLabels) ? account.movementLabels : [];
@@ -176,12 +182,28 @@ function loadAccounts() {
   return accounts;
 }
 
-function writeAccounts(accounts) {
+function writeAccounts(accounts, options = {}) {
   assertCoherent(accounts);
   const normalized = accounts.map(canonicalAccount);
+  let nextRevision = 0;
 
   db.exec('BEGIN IMMEDIATE');
   try {
+    const currentRevision = getRevision();
+    if (options.checkRevision) {
+      const expected = Number(options.expectedRevision);
+      if (!Number.isInteger(expected) || expected !== currentRevision) {
+        const conflict = new AccountStoreError(
+          'Ces données ont été modifiées depuis un autre navigateur. L’affichage a été mis à jour.',
+          409
+        );
+        conflict.revision = currentRevision;
+        conflict.accounts = loadAccounts();
+        throw conflict;
+      }
+    }
+    nextRevision = currentRevision + 1;
+
     db.exec('DELETE FROM movements');
     db.exec('DELETE FROM accounts');
 
@@ -229,6 +251,11 @@ function writeAccounts(accounts) {
       }
     }
 
+    db.prepare(`
+      INSERT INTO meta (key, value) VALUES ('revision', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(String(nextRevision));
+
     db.exec('COMMIT');
   } catch (error) {
     try {
@@ -239,7 +266,7 @@ function writeAccounts(accounts) {
     throw error;
   }
 
-  return loadAccounts();
+  return { accounts: loadAccounts(), revision: nextRevision };
 }
 
 function rebuildDatabaseFromSql() {
@@ -285,6 +312,7 @@ module.exports = {
   SQL_FILE,
   AccountStoreError,
   initStore,
+  getRevision,
   loadAccounts,
   writeAccounts,
 };
