@@ -386,7 +386,7 @@ const defaultAccounts = [
   },
   {
     "owner": "sabrine nattes",
-    "username": "sabrine.nattes@ecoris.demo",
+    "username": "sabrine.nattes@ecorisebanque.fr",
     "pin": "Galet-6744",
     "movements": [
       400000,
@@ -1972,7 +1972,8 @@ function showView(view, options = {}) {
   if (!options.keepSidebar) closeSidebar();
 }
 
-const DEMO_EMAIL_DOMAIN = 'ecoris.demo';
+const CLIENT_EMAIL_DOMAIN = 'ecorisebanque.fr';
+const VALID_CLIENT_EMAIL = /^[a-z0-9]+(?:\.[a-z0-9]+)*@[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z]{2,}$/;
 
 function slugifyAccountName(name) {
   return String(name || '')
@@ -1985,14 +1986,19 @@ function slugifyAccountName(name) {
 }
 
 function generateClientEmail(owner) {
-  const base = slugifyAccountName(owner) || 'client';
+  const base = slugifyAccountName(owner).replace(/demo/g, '').replace(/\.{2,}/g, '.').replace(/^\.+|\.+$/g, '') || 'client';
   const taken = new Set(accounts.map(account => String(account.username).toLowerCase()));
   taken.add(ADMIN.username.toLowerCase());
-  let email = `${base}@${DEMO_EMAIL_DOMAIN}`;
+  let local = base;
   let suffix = 2;
+  let email = `${local}@${CLIENT_EMAIL_DOMAIN}`;
   while (taken.has(email)) {
-    email = `${base}${suffix}@${DEMO_EMAIL_DOMAIN}`;
+    local = `${base}${suffix}`;
+    email = `${local}@${CLIENT_EMAIL_DOMAIN}`;
     suffix += 1;
+  }
+  if (!VALID_CLIENT_EMAIL.test(email) || email.includes('demo')) {
+    throw new Error('Adresse e-mail générée invalide');
   }
   return email;
 }
