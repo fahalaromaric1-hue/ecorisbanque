@@ -271,11 +271,82 @@ function writeAccounts(accounts, options = {}) {
   try {
     writeAccountsFile(saved);
     publishAccountPages(saved);
+    writeSqlDump();
   } catch (error) {
     console.error('Publication des pages de compte impossible.', error);
   }
 
   return { accounts: saved, revision: nextRevision };
+}
+
+function sqlLiteral(value) {
+  if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'NULL';
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function writeSqlDump() {
+  const metas = db.prepare('SELECT key, value FROM meta ORDER BY key').all();
+  const accountRows = db.prepare(`
+    SELECT username, owner, pin, balance, statement_balance, document, updated_at
+    FROM accounts
+    ORDER BY rowid
+  `).all();
+  const movementRows = db.prepare(`
+    SELECT username, position, amount, label, occurred_at
+    FROM movements
+    ORDER BY rowid, position
+  `).all();
+  const lines = [
+    '-- Schéma et données Ecorise Banque.',
+    '-- Au démarrage, ce script reconstruit data/ecorisbanque.sqlite s’il est absent.',
+    'PRAGMA foreign_keys = OFF;',
+    '',
+    'BEGIN TRANSACTION;',
+    '',
+    `CREATE TABLE meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );`,
+    '',
+    `CREATE TABLE accounts (
+      username TEXT PRIMARY KEY COLLATE NOCASE,
+      owner TEXT NOT NULL,
+      pin TEXT NOT NULL,
+      balance REAL NOT NULL,
+      statement_balance REAL NOT NULL,
+      document TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );`,
+    '',
+    `CREATE TABLE movements (
+      username TEXT NOT NULL COLLATE NOCASE,
+      position INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      label TEXT NOT NULL DEFAULT '',
+      occurred_at TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (username, position),
+      FOREIGN KEY (username) REFERENCES accounts(username) ON DELETE CASCADE
+    );`,
+    '',
+  ];
+  for (const row of metas) {
+    lines.push(`INSERT INTO meta (key, value) VALUES (${sqlLiteral(row.key)}, ${sqlLiteral(row.value)});`);
+  }
+  if (metas.length) lines.push('');
+  for (const row of accountRows) {
+    lines.push(
+      `INSERT INTO accounts (username, owner, pin, balance, statement_balance, document, updated_at) VALUES (${sqlLiteral(row.username)}, ${sqlLiteral(row.owner)}, ${sqlLiteral(row.pin)}, ${sqlLiteral(row.balance)}, ${sqlLiteral(row.statement_balance)}, ${sqlLiteral(row.document)}, ${sqlLiteral(row.updated_at)});`
+    );
+  }
+  if (accountRows.length) lines.push('');
+  for (const row of movementRows) {
+    lines.push(
+      `INSERT INTO movements (username, position, amount, label, occurred_at) VALUES (${sqlLiteral(row.username)}, ${sqlLiteral(row.position)}, ${sqlLiteral(row.amount)}, ${sqlLiteral(row.label)}, ${sqlLiteral(row.occurred_at)});`
+    );
+  }
+  lines.push('', 'COMMIT;', '');
+  fs.writeFileSync(SQL_FILE, lines.join('\n'));
 }
 
 function rebuildDatabaseFromSql() {

@@ -2639,15 +2639,10 @@ adminEditForm.addEventListener('submit', async e => {
     }
 
     const newName = adminEditName.value.trim();
-    const newPin = adminEditPin?.value.trim() || '';
     const newBalance = Number(adminEditBalance.value);
 
     if (!newName) {
       showError('Le nom affiché est requis.');
-      return;
-    }
-    if (newPin && newPin.length < 4) {
-      showError('Le mot de passe doit contenir au moins 4 caractères.');
       return;
     }
     if (!Number.isFinite(newBalance)) {
@@ -2656,15 +2651,25 @@ adminEditForm.addEventListener('submit', async e => {
     }
 
     const previousBalance = getAccountBalance(account);
+    const loginUsername = account.username;
+    const loginPin = String(account.pin ?? '');
     account.owner = newName;
-    if (newPin) account.pin = newPin;
+    account.username = loginUsername;
+    account.pin = loginPin;
     if (adminEditPin) adminEditPin.value = '';
     const balanceChanged = roundAmount(newBalance) !== roundAmount(previousBalance);
     if (balanceChanged) {
+      account.movements = [];
+      account.movementLabels = [];
+      account.movementDates = [];
+      account.balance = 0;
+      account.statementBalance = 0;
       const statement = buildStatementForBalance(account.owner, newBalance);
       account.movements = statement.movements;
       account.movementLabels = statement.movementLabels;
       account.movementDates = statement.movementDates;
+      account.username = loginUsername;
+      account.pin = loginPin;
     }
     const finalBalance = rememberAccountBalance(account);
     if (balanceChanged && finalBalance !== roundAmount(newBalance)) {
@@ -2684,17 +2689,10 @@ adminEditForm.addEventListener('submit', async e => {
     refreshAdminAccount(username);
 
     if (currentAccount?.username === username) updateUI(currentAccount);
-    const pinMsg = newPin ? ' — mot de passe mis à jour' : '';
     showSuccess(
-      `Compte mis à jour : ${newName} — solde ${formatCurrency(finalBalance, account.locale, account.currency)}${pinMsg}` +
+      `Compte mis à jour : ${newName} — solde ${formatCurrency(finalBalance, account.locale, account.currency)}` +
         (balanceChanged ? ' — relevé régénéré' : '')
     );
-
-
-
-    if (currentAccount?.username === username && newPin) {
-      saveSession(username, newPin, 'user');
-    }
   }, 'Mise à jour du compte…');
 });
 
