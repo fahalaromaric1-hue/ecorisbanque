@@ -2531,14 +2531,12 @@ loginForm.addEventListener('submit', async e => {
   e.preventDefault();
   const username = normalizeLoginUsername(inputUsername.value);
   const pin = normalizeLoginPassword(inputPin.value);
-  let fresh = null;
   try {
-    fresh = await fetchServerAccounts();
+    const fresh = await fetchServerAccounts();
     applyServerAccounts(fresh.accounts, fresh.revision);
   } catch (error) {
     console.warn('Lecture du serveur avant connexion impossible.', error);
-    showError(msg('syncOffline'));
-    return;
+    if (!accounts.length) adoptAccounts(loadAccounts().map(cloneAccount));
   }
 
   if (isAdminLogin(username, pin)) {
