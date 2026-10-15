@@ -2051,7 +2051,7 @@ function generateClientEmail(owner) {
   let suffix = 2;
   let email = `${local}@${CLIENT_EMAIL_DOMAIN}`;
   while (taken.has(email)) {
-    local = `${base}${suffix}`;
+    local = `${base}.${suffix}`;
     email = `${local}@${CLIENT_EMAIL_DOMAIN}`;
     suffix += 1;
   }
@@ -2683,45 +2683,60 @@ adminEditForm.addEventListener('submit', async e => {
   }, 'Mise à jour du compte…');
 });
 
-function buildOpeningStatement(targetBalance = 0) {
-  const dayMs = 24 * 60 * 60 * 1000;
-  const lines = [
-    [1800, 'Virement reçu — salaire'],
-    [-1850, 'Virement émis — loyer'],
-    [640, 'Virement reçu — remboursement'],
-    [-710, 'Virement émis — électricité'],
-    [320, 'Dépôt espèces'],
-    [-275, 'Paiement carte — courses'],
-    [210, 'Virement reçu — prestation'],
-    [-180, 'Paiement carte — carburant'],
-    [150, 'Virement reçu — versement'],
-    [-120, 'Retrait DAB'],
-    [90, "Dépôt d'ouverture"],
-    [-60, 'Frais de tenue de compte'],
-    [75, 'Virement reçu — salaire'],
-    [-45, 'Retrait DAB — agence'],
-    [0, 'Frais bancaires'],
-  ];
-  const target = roundAmount(targetBalance);
-  const subtotal = lines.slice(0, -1).reduce((sum, [amount]) => sum + amount, 0);
-  lines[lines.length - 1][0] = roundAmount(target - subtotal);
-  if (lines[lines.length - 1][0] === 0) {
-    lines[lines.length - 2][0] = roundAmount(lines[lines.length - 2][0] - 10);
-    lines[lines.length - 1][0] = 10;
+function accountNameSeed(owner) {
+  let hash = 2166136261;
+  for (const char of String(owner || '')) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
   }
+  return hash >>> 0;
+}
 
-  const gapDays = [21, 45, 90, 30, 120, 28, 60, 21, 75, 40, 100, 24, 55, 35];
-  const latest = Date.now() - 4 * dayMs;
-  const earliest = new Date(latest);
-  earliest.setUTCFullYear(earliest.getUTCFullYear() - 3);
-  earliest.setUTCDate(earliest.getUTCDate() + 7);
-  const totalDays = gapDays.reduce((sum, days) => sum + days, 0);
-  let cursor = Math.max(earliest.getTime(), latest - totalDays * dayMs);
+function buildOpeningStatement(owner) {
+  const seed = accountNameSeed(owner) || 1;
+  let state = seed;
+  const next = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  const pick = (min, max) => min + Math.floor(next() * (max - min + 1));
+  const salary = pick(2200, 3600);
+  const rent = pick(680, 1150);
+  const lines = [
+    [salary, 'Virement reçu — salaire'],
+    [-rent, 'Prélèvement — loyer'],
+    [-pick(42, 96), 'Prélèvement — électricité'],
+    [-pick(48, 160), 'Paiement carte — courses'],
+    [-pick(32, 85), 'Paiement carte — carburant'],
+    [pick(120, 480), 'Virement reçu — remboursement'],
+    [-pick(20, 60), 'Retrait DAB'],
+    [salary, 'Virement reçu — salaire'],
+    [-rent, 'Prélèvement — loyer'],
+    [-pick(18, 55), 'Prélèvement — téléphone'],
+    [-pick(36, 140), 'Paiement carte — courses'],
+    [pick(80, 320), 'Virement reçu — versement'],
+    [-pick(8, 24), 'Frais de tenue de compte'],
+    [-pick(28, 90), 'Paiement carte — carburant'],
+    [pick(150, 700), "Dépôt d'espèces"],
+    [-pick(20, 80), 'Retrait DAB'],
+    [salary, 'Virement reçu — salaire'],
+    [-rent, 'Prélèvement — loyer'],
+    [-pick(25, 110), 'Paiement carte — courses'],
+  ];
+  let sum = lines.reduce((total, [amount]) => total + amount, 0);
+  if (sum < 500) lines.push([pick(800, 1800), 'Virement reçu — salaire']);
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const latest = Date.now() - 3 * dayMs;
+  const gapDays = lines.slice(1).map(() => pick(16, 36));
+  const totalDays = gapDays.reduce((total, days) => total + days, 0);
+  let cursor = latest - totalDays * dayMs;
   const movementDates = [new Date(cursor).toISOString()];
   gapDays.forEach(days => {
     cursor += days * dayMs;
-    movementDates.push(new Date(Math.min(cursor, latest)).toISOString());
+    movementDates.push(new Date(cursor).toISOString());
   });
+  movementDates[movementDates.length - 1] = new Date(latest).toISOString();
 
   return {
     movements: lines.map(([amount]) => amount),
@@ -2729,7 +2744,6 @@ function buildOpeningStatement(targetBalance = 0) {
     movementDates,
   };
 }
-
 if (adminCreateForm) {
   adminCreateForm.addEventListener('submit', async e => {
     e.preventDefault();
@@ -2745,18 +2759,31 @@ if (adminCreateForm) {
       const username = generateClientEmail(owner);
       const pin = generateClientPassword(owner);
       const account = createAccount(owner, username, pin);
-      const statement = buildOpeningStatement(0);
+      const statement = buildOpeningStatement(owner);
       account.movements = statement.movements;
       account.movementDates = statement.movementDates;
       account.movementLabels = statement.movementLabels;
-      rememberAccountBalance(account);
+      const balance = rememberAccountBalance(account);
+      if (balance !== roundAmount(statement.movements.reduce((sum, amount) => sum + amount, 0))) {
+        showError('Le relevé ne correspond pas au solde. Le compte n’a pas été créé.');
+        return;
+      }
       accounts.push(account);
-      await persistAccounts();
+      const saved = await persistAccounts();
       const stored = accounts.find(acc => String(acc.username).trim().toLowerCase() === username.toLowerCase());
-      if (!stored) return;
+      const recorded = saved && stored && String(stored.pin) === String(pin) && roundAmount(stored.balance) === balance
+        && stored.movements.length === statement.movements.length;
+      if (!recorded) {
+        if (!saved) {
+          const index = accounts.findIndex(acc => String(acc.username).trim().toLowerCase() === username.toLowerCase());
+          if (index >= 0) accounts.splice(index, 1);
+        }
+        showError('Le compte n’a pas été enregistré dans la base. Les identifiants ne sont pas valides.');
+        return;
+      }
       adminCreateName.value = '';
-      showCreatedCredentials(stored.username, String(stored.pin ?? pin));
-      refreshAdminAccount(username);
+      showCreatedCredentials(stored.username, String(stored.pin));
+      refreshAdminAccount(stored.username);
       showSuccess(`Compte créé : ${owner}`);
     }, 'Création du compte…');
   });
