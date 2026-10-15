@@ -385,6 +385,12 @@ button {
   display: none;
 }
 
+.app.is-admin-view .btn--menu,
+.app.is-admin-view .sidebar,
+.app.is-admin-view .sidebar-overlay {
+  display: none;
+}
+
 .app.is-login-view .main {
   display: flex;
   flex-direction: column;

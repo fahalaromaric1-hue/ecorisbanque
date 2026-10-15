@@ -2247,7 +2247,7 @@ function showAdminPanel() {
   containerDashboard.classList.add('hidden');
   containerAdmin.classList.remove('hidden');
   applyUiLocale(visitorLocale);
-  btnMenu.classList.remove('hidden');
+  btnMenu.classList.add('hidden');
   showAccountMenu({ admin: true });
   closeSidebar();
   renderAdminUserList();
@@ -2265,6 +2265,7 @@ function updateLoginViewState() {
   if (!appRoot || !containerLogin) return;
   const loginVisible = !containerLogin.classList.contains('hidden') && !isAdminSession;
   appRoot.classList.toggle('is-login-view', loginVisible);
+  appRoot.classList.toggle('is-admin-view', isAdminSession);
 }
 
 function showAccountMenu({ admin = false } = {}) {
