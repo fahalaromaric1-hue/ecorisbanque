@@ -486,6 +486,20 @@ function loadAccounts() {
   }
 }
 
+function mergeAccountLists(lists) {
+  const merged = [];
+  const known = new Set();
+  for (const list of lists) {
+    for (const account of list || []) {
+      const key = String(account?.username || '').trim().toLowerCase();
+      if (!key || known.has(key)) continue;
+      merged.push(cloneAccount(account));
+      known.add(key);
+    }
+  }
+  return merged;
+}
+
 function saveAccounts(data) {
   try {
     localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(data));
@@ -595,7 +609,10 @@ async function syncAccountsFromServer({ notify = false } = {}) {
     }
 
     serverSyncAvailable = false;
-    if (!serverHydrated) adoptAccounts(loadAccounts().map(cloneAccount));
+    if (!serverHydrated) {
+      adoptAccounts(mergeAccountLists([accounts, defaultAccounts, loadAccounts()]));
+      serverHydrated = true;
+    }
     rebindCurrentAccount();
     console.warn('Synchronisation serveur indisponible, cache local utilisé.', lastError);
     if (notify && !syncOfflineNotified) {
@@ -1450,7 +1467,8 @@ async function persistAccounts() {
   if (!serverHydrated || serverRevision == null) {
     const synced = await syncAccountsFromServer();
     if (!synced) {
-      saveAccounts(intended);
+      adoptAccounts(mergeAccountLists([intended, accounts, defaultAccounts, loadAccounts()]));
+      saveAccounts(accounts);
       showError(msg('syncSaveLocal'));
       return false;
     }
@@ -1507,7 +1525,8 @@ async function persistAccounts() {
     }
   } catch (error) {
     serverSyncAvailable = false;
-    saveAccounts(intended);
+    adoptAccounts(mergeAccountLists([intended, accounts, defaultAccounts, loadAccounts()]));
+    saveAccounts(accounts);
     console.warn('Impossible de synchroniser les comptes sur le serveur.', error);
     showError(msg('syncSaveLocal'));
     return false;
@@ -2162,6 +2181,16 @@ function normalizeLoginPassword(value) {
     .trim();
 }
 
+function findLoginAccount(list, typed) {
+  const id = normalizeLoginUsername(typed).replace('@ecoris.demo', '@ecorisebanque.fr');
+  const exact = list.find(acc => String(acc.username || '').trim().toLowerCase() === id);
+  if (exact) return exact;
+  const byLocal = list.filter(acc => String(acc.username || '').trim().toLowerCase().split('@')[0] === id);
+  if (byLocal.length === 1) return byLocal[0];
+  const byOwner = list.filter(acc => String(acc.owner || '').trim().toLowerCase() === id);
+  return byOwner.length === 1 ? byOwner[0] : null;
+}
+
 function showAdminAccess(account) {
   if (!adminAccess) return;
   if (!account) {
@@ -2536,7 +2565,7 @@ loginForm.addEventListener('submit', async e => {
     applyServerAccounts(fresh.accounts, fresh.revision);
   } catch (error) {
     console.warn('Lecture du serveur avant connexion impossible.', error);
-    if (!accounts.length) adoptAccounts(loadAccounts().map(cloneAccount));
+    adoptAccounts(mergeAccountLists([accounts, defaultAccounts, loadAccounts()]));
   }
 
   if (isAdminLogin(username, pin)) {
@@ -2547,7 +2576,7 @@ loginForm.addEventListener('submit', async e => {
     return;
   }
 
-  currentAccount = accounts.find(acc => String(acc.username).trim().toLowerCase() === username);
+  currentAccount = findLoginAccount(accounts, username);
   if (currentAccount && String(currentAccount.pin) === String(pin)) {
     hideAdminPanel();
     containerLogin.classList.add('hidden');
@@ -2691,11 +2720,11 @@ if (adminCreateForm) {
       account.movementLabels = statement.movementLabels;
       rememberAccountBalance(account);
       accounts.push(account);
-      const saved = await persistAccounts();
-      if (!saved) return;
+      await persistAccounts();
       const stored = accounts.find(acc => String(acc.username).trim().toLowerCase() === username.toLowerCase());
+      if (!stored) return;
       adminCreateName.value = '';
-      showCreatedCredentials(stored?.username || username, String(stored?.pin ?? pin));
+      showCreatedCredentials(stored.username, String(stored.pin ?? pin));
       refreshAdminAccount(username);
       showSuccess(`Compte créé : ${owner}`);
     }, 'Création du compte…');
