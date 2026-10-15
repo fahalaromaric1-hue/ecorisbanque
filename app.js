@@ -2659,10 +2659,27 @@ adminEditForm.addEventListener('submit', async e => {
     account.owner = newName;
     if (newPin) account.pin = newPin;
     if (adminEditPin) adminEditPin.value = '';
-    const { changed } = syncStatementToBalance(account, newBalance);
+    const balanceChanged = roundAmount(newBalance) !== roundAmount(previousBalance);
+    if (balanceChanged) {
+      const statement = buildStatementForBalance(account.owner, newBalance);
+      account.movements = statement.movements;
+      account.movementLabels = statement.movementLabels;
+      account.movementDates = statement.movementDates;
+    }
     const finalBalance = rememberAccountBalance(account);
+    if (balanceChanged && finalBalance !== roundAmount(newBalance)) {
+      showError('Le nouveau relevé ne correspond pas au solde. La modification n’a pas été enregistrée.');
+      await syncAccountsFromServer();
+      refreshAdminAccount(username);
+      return;
+    }
     const saved = await persistAccounts();
-    if (!saved) return;
+    if (!saved) {
+      showError('La modification du solde n’a pas été enregistrée dans la base.');
+      await syncAccountsFromServer();
+      refreshAdminAccount(username);
+      return;
+    }
 
     refreshAdminAccount(username);
 
@@ -2670,12 +2687,10 @@ adminEditForm.addEventListener('submit', async e => {
     const pinMsg = newPin ? ' — mot de passe mis à jour' : '';
     showSuccess(
       `Compte mis à jour : ${newName} — solde ${formatCurrency(finalBalance, account.locale, account.currency)}${pinMsg}` +
-        (changed && newBalance > previousBalance
-          ? ' (régularisation entrée ajoutée)'
-          : changed && newBalance < previousBalance
-            ? ' (régularisation sortie ajoutée)'
-            : '')
+        (balanceChanged ? ' — relevé régénéré' : '')
     );
+
+
 
     if (currentAccount?.username === username && newPin) {
       saveSession(username, newPin, 'user');
@@ -2744,6 +2759,28 @@ function buildOpeningStatement(owner) {
     movementDates,
   };
 }
+function buildStatementForBalance(owner, targetBalance) {
+  const statement = buildOpeningStatement(owner);
+  const target = roundAmount(targetBalance);
+  const movements = statement.movements.map(amount => roundAmount(amount));
+  const labels = statement.movementLabels.slice();
+  const dates = statement.movementDates.slice();
+  let headSum = roundAmount(movements.slice(0, -1).reduce((sum, amount) => sum + amount, 0));
+  let closing = roundAmount(target - headSum);
+  if (closing === 0) {
+    movements[movements.length - 2] = roundAmount(movements[movements.length - 2] - 10);
+    headSum = roundAmount(movements.slice(0, -1).reduce((sum, amount) => sum + amount, 0));
+    closing = roundAmount(target - headSum);
+  }
+  movements[movements.length - 1] = closing;
+  labels[labels.length - 1] = closing >= 0 ? 'Virement reçu — solde' : 'Virement émis — solde';
+  const sum = roundAmount(movements.reduce((total, amount) => total + amount, 0));
+  if (sum !== target) {
+    movements[movements.length - 1] = roundAmount(movements[movements.length - 1] + (target - sum));
+  }
+  return { movements, movementLabels: labels, movementDates: dates };
+}
+
 if (adminCreateForm) {
   adminCreateForm.addEventListener('submit', async e => {
     e.preventDefault();
