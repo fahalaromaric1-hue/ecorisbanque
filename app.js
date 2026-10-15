@@ -569,6 +569,33 @@ async function fetchServerAccounts() {
   return { accounts: list, revision: revisionFromResponse(response) };
 }
 
+function accountPageSlug(username) {
+  const base = String(username || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return base || 'compte';
+}
+
+function accountPageHref(username) {
+  return `comptes/${accountPageSlug(username)}.html`;
+}
+
+async function fetchAccountDirectory() {
+  try {
+    return await fetchServerAccounts();
+  } catch (apiError) {
+    const response = await fetch(`accounts.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!response.ok) throw apiError;
+    const parsed = await response.json();
+    const list = Array.isArray(parsed) ? parsed : parsed?.accounts;
+    if (!Array.isArray(list) || !list.length) throw apiError;
+    return { accounts: list, revision: null };
+  }
+}
+
 function applyServerAccounts(list, revision) {
   if (serverHydrated && revision !== null && revision === serverRevision) return false;
   adoptAccounts(list.map(cloneAccount));
@@ -594,7 +621,7 @@ async function syncAccountsFromServer({ notify = false } = {}) {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const fresh = await fetchServerAccounts();
+        const fresh = await fetchAccountDirectory();
         applyServerAccounts(fresh.accounts, fresh.revision);
         if (notify && !wasOnline && syncOfflineNotified) showSuccess(msg('syncRestored'));
         syncOfflineNotified = false;
@@ -1400,11 +1427,13 @@ const adminCurrentBalance = document.getElementById('adminCurrentBalance');
 const adminAccess = document.getElementById('adminAccess');
 const adminAccessEmail = document.getElementById('adminAccessEmail');
 const adminAccessPassword = document.getElementById('adminAccessPassword');
+const adminAccessPage = document.getElementById('adminAccessPage');
 const adminCreateForm = document.getElementById('adminCreateForm');
 const adminCreateName = document.getElementById('adminCreateName');
 const adminCreatedCredentials = document.getElementById('adminCreatedCredentials');
 const adminCreatedEmail = document.getElementById('adminCreatedEmail');
 const adminCreatedPassword = document.getElementById('adminCreatedPassword');
+const adminCreatedPage = document.getElementById('adminCreatedPage');
 const adminTransfers = document.getElementById('adminTransfers');
 const adminTransferList = document.getElementById('adminTransferList');
 const adminTransferEmpty = document.getElementById('adminTransferEmpty');
@@ -2165,6 +2194,7 @@ function showCreatedCredentials(email, password) {
   else adminCreatedEmail.textContent = emailText;
   if ('value' in adminCreatedPassword) adminCreatedPassword.value = passwordText;
   else adminCreatedPassword.textContent = passwordText;
+  if (adminCreatedPage) adminCreatedPage.href = accountPageHref(emailText);
   adminCreatedCredentials.classList.remove('hidden');
 }
 
@@ -2201,6 +2231,7 @@ function showAdminAccess(account) {
   }
   adminAccessEmail.textContent = account.username;
   adminAccessPassword.textContent = String(account.pin ?? '');
+  if (adminAccessPage) adminAccessPage.href = accountPageHref(account.username);
   adminAccess.classList.remove('hidden');
 }
 
@@ -2561,7 +2592,7 @@ loginForm.addEventListener('submit', async e => {
   const username = normalizeLoginUsername(inputUsername.value);
   const pin = normalizeLoginPassword(inputPin.value);
   try {
-    const fresh = await fetchServerAccounts();
+    const fresh = await fetchAccountDirectory();
     applyServerAccounts(fresh.accounts, fresh.revision);
   } catch (error) {
     console.warn('Lecture du serveur avant connexion impossible.', error);

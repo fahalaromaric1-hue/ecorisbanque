@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
+const { publishAccountPages, writeAccountsFile } = require('./publish');
 
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, 'data');
@@ -266,7 +267,15 @@ function writeAccounts(accounts, options = {}) {
     throw error;
   }
 
-  return { accounts: loadAccounts(), revision: nextRevision };
+  const saved = loadAccounts();
+  try {
+    writeAccountsFile(saved);
+    publishAccountPages(saved);
+  } catch (error) {
+    console.error('Publication des pages de compte impossible.', error);
+  }
+
+  return { accounts: saved, revision: nextRevision };
 }
 
 function rebuildDatabaseFromSql() {

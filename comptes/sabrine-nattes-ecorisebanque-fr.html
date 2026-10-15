@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compte de sabrine nattes — Ecorise Banque</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #f4f7fb; color: #1a1a2e; }
+    main { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin-bottom: 24px; }
+    h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    .brand { color: #1c7ed6; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.78rem; }
+    .balance { font-size: 1.8rem; font-weight: 700; color: #1c7ed6; margin: 0; }
+    .card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(26, 26, 46, 0.06); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid #e6ebf2; text-align: left; vertical-align: top; }
+    th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #5c6b7a; }
+    td:nth-child(4), td:nth-child(5), th:nth-child(4), th:nth-child(5) { text-align: right; white-space: nowrap; }
+    .out { color: #c92a2a; }
+    .in { color: #2b8a3e; }
+    .check { margin-top: 16px; color: #2b8a3e; font-weight: 600; }
+    a { color: #1c7ed6; }
+    @media (max-width: 700px) {
+      header { flex-direction: column; align-items: start; }
+      table { font-size: 0.92rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="brand">Ecorise Banque</p>
+    <header>
+      <div>
+        <h1>Compte de sabrine nattes</h1>
+        <p>Identifiant de connexion : sabrine.nattes@ecorisebanque.fr</p>
+      </div>
+      <p class="balance">1 234 556,00 €</p>
+    </header>
+    <section class="card">
+      <h2>Relevé</h2>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Date</th><th>Opération</th><th>Montant</th><th>Solde</th></tr>
+        </thead>
+        <tbody><tr>
+        <td>1</td>
+        <td>20/10/2023</td>
+        <td>Dépôt d'ouverture</td>
+        <td class="in">400 000,00 €</td>
+        <td>400 000,00 €</td>
+      </tr><tr>
+        <td>2</td>
+        <td>19/11/2023</td>
+        <td>Virement reçu — salaire</td>
+        <td class="in">250 000,00 €</td>
+        <td>650 000,00 €</td>
+      </tr><tr>
+        <td>3</td>
+        <td>22/01/2024</td>
+        <td>Virement reçu — salaire juin</td>
+        <td class="in">250 000,00 €</td>
+        <td>900 000,00 €</td>
+      </tr><tr>
+        <td>4</td>
+        <td>06/06/2024</td>
+        <td>Dépôt espèces</td>
+        <td class="in">150 000,00 €</td>
+        <td>1 050 000,00 €</td>
+      </tr><tr>
+        <td>5</td>
+        <td>19/07/2024</td>
+        <td>Virement reçu — remboursement</td>
+        <td class="in">100 000,00 €</td>
+        <td>1 150 000,00 €</td>
+      </tr><tr>
+        <td>6</td>
+        <td>07/01/2025</td>
+        <td>Virement reçu — prestation</td>
+        <td class="in">80 000,00 €</td>
+        <td>1 230 000,00 €</td>
+      </tr><tr>
+        <td>7</td>
+        <td>16/02/2025</td>
+        <td>Retrait DAB</td>
+        <td class="out">-400,00 €</td>
+        <td>1 229 600,00 €</td>
+      </tr><tr>
+        <td>8</td>
+        <td>13/05/2025</td>
+        <td>Retrait DAB — agence</td>
+        <td class="out">-250,00 €</td>
+        <td>1 229 350,00 €</td>
+      </tr><tr>
+        <td>9</td>
+        <td>08/06/2025</td>
+        <td>Frais de tenue de compte</td>
+        <td class="out">-18,00 €</td>
+        <td>1 229 332,00 €</td>
+      </tr><tr>
+        <td>10</td>
+        <td>23/09/2025</td>
+        <td>Frais bancaires</td>
+        <td class="out">-12,00 €</td>
+        <td>1 229 320,00 €</td>
+      </tr><tr>
+        <td>11</td>
+        <td>19/11/2025</td>
+        <td>Virement émis — loyer</td>
+        <td class="out">-1 200,00 €</td>
+        <td>1 228 120,00 €</td>
+      </tr><tr>
+        <td>12</td>
+        <td>26/04/2026</td>
+        <td>Virement émis — électricité</td>
+        <td class="out">-186,00 €</td>
+        <td>1 227 934,00 €</td>
+      </tr><tr>
+        <td>13</td>
+        <td>30/05/2026</td>
+        <td>Paiement carte — courses</td>
+        <td class="out">-320,00 €</td>
+        <td>1 227 614,00 €</td>
+      </tr><tr>
+        <td>14</td>
+        <td>17/08/2026</td>
+        <td>Paiement carte — carburant</td>
+        <td class="out">-85,00 €</td>
+        <td>1 227 529,00 €</td>
+      </tr><tr>
+        <td>15</td>
+        <td>06/10/2026</td>
+        <td>Virement reçu — versement</td>
+        <td class="in">7 027,00 €</td>
+        <td>1 234 556,00 €</td>
+      </tr></tbody>
+      </table>
+      <p class="check">Somme des 15 opérations : 1 234 556,00 €. Ce montant est le solde du compte.</p>
+      <p><a href="../index.html">Se connecter à ce compte</a></p>
+    </section>
+  </main>
+</body>
+</html>

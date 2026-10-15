@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compte de Marie Dubois — Ecorise Banque</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #f4f7fb; color: #1a1a2e; }
+    main { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin-bottom: 24px; }
+    h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    .brand { color: #1c7ed6; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.78rem; }
+    .balance { font-size: 1.8rem; font-weight: 700; color: #1c7ed6; margin: 0; }
+    .card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(26, 26, 46, 0.06); }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid #e6ebf2; text-align: left; vertical-align: top; }
+    th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: #5c6b7a; }
+    td:nth-child(4), td:nth-child(5), th:nth-child(4), th:nth-child(5) { text-align: right; white-space: nowrap; }
+    .out { color: #c92a2a; }
+    .in { color: #2b8a3e; }
+    .check { margin-top: 16px; color: #2b8a3e; font-weight: 600; }
+    a { color: #1c7ed6; }
+    @media (max-width: 700px) {
+      header { flex-direction: column; align-items: start; }
+      table { font-size: 0.92rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="brand">Ecorise Banque</p>
+    <header>
+      <div>
+        <h1>Compte de Marie Dubois</h1>
+        <p>Identifiant de connexion : md</p>
+      </div>
+      <p class="balance">127 353,00 €</p>
+    </header>
+    <section class="card">
+      <h2>Relevé</h2>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Date</th><th>Opération</th><th>Montant</th><th>Solde</th></tr>
+        </thead>
+        <tbody><tr>
+        <td>1</td>
+        <td>22/10/2023</td>
+        <td>Virement reçu</td>
+        <td class="in">500,00 €</td>
+        <td>500,00 €</td>
+      </tr><tr>
+        <td>2</td>
+        <td>21/11/2023</td>
+        <td>Virement reçu</td>
+        <td class="in">340,00 €</td>
+        <td>840,00 €</td>
+      </tr><tr>
+        <td>3</td>
+        <td>23/01/2024</td>
+        <td>Virement émis</td>
+        <td class="out">-300,00 €</td>
+        <td>540,00 €</td>
+      </tr><tr>
+        <td>4</td>
+        <td>06/06/2024</td>
+        <td>Virement émis</td>
+        <td class="out">-20,00 €</td>
+        <td>520,00 €</td>
+      </tr><tr>
+        <td>5</td>
+        <td>19/07/2024</td>
+        <td>Virement émis</td>
+        <td class="out">-460,00 €</td>
+        <td>60,00 €</td>
+      </tr><tr>
+        <td>6</td>
+        <td>05/01/2025</td>
+        <td>Virement reçu</td>
+        <td class="in">200,00 €</td>
+        <td>260,00 €</td>
+      </tr><tr>
+        <td>7</td>
+        <td>14/02/2025</td>
+        <td>Virement reçu</td>
+        <td class="in">190,00 €</td>
+        <td>450,00 €</td>
+      </tr><tr>
+        <td>8</td>
+        <td>10/05/2025</td>
+        <td>Virement reçu</td>
+        <td class="in">1 000,00 €</td>
+        <td>1 450,00 €</td>
+      </tr><tr>
+        <td>9</td>
+        <td>04/06/2025</td>
+        <td>Virement reçu — salaire</td>
+        <td class="in">80 000,00 €</td>
+        <td>81 450,00 €</td>
+      </tr><tr>
+        <td>10</td>
+        <td>19/09/2025</td>
+        <td>Dépôt espèces</td>
+        <td class="in">20 000,00 €</td>
+        <td>101 450,00 €</td>
+      </tr><tr>
+        <td>11</td>
+        <td>14/11/2025</td>
+        <td>Virement reçu — remboursement</td>
+        <td class="in">15 000,00 €</td>
+        <td>116 450,00 €</td>
+      </tr><tr>
+        <td>12</td>
+        <td>19/04/2026</td>
+        <td>Retrait DAB</td>
+        <td class="out">-500,00 €</td>
+        <td>115 950,00 €</td>
+      </tr><tr>
+        <td>13</td>
+        <td>23/05/2026</td>
+        <td>Frais de tenue de compte</td>
+        <td class="out">-12,00 €</td>
+        <td>115 938,00 €</td>
+      </tr><tr>
+        <td>14</td>
+        <td>09/08/2026</td>
+        <td>Virement émis — loyer</td>
+        <td class="out">-800,00 €</td>
+        <td>115 138,00 €</td>
+      </tr><tr>
+        <td>15</td>
+        <td>28/09/2026</td>
+        <td>Virement reçu — versement complémentaire</td>
+        <td class="in">12 215,00 €</td>
+        <td>127 353,00 €</td>
+      </tr></tbody>
+      </table>
+      <p class="check">Somme des 15 opérations : 127 353,00 €. Ce montant est le solde du compte.</p>
+      <p><a href="../index.html">Se connecter à ce compte</a></p>
+    </section>
+  </main>
+</body>
+</html>
