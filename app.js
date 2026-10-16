@@ -7,7 +7,18 @@ const SESSION_KEY = 'ebank_session_v1';
 const SIGNUP_ENABLED = false;
 const ACCOUNTS_KEY = 'ebank_accounts_v1';
 const DISPLAY_NAMES_KEY = 'ebank_display_names_v1';
-const ACCOUNTS_API = '/api/accounts';
+const HOSTED_API_ORIGIN = 'https://ecorisbanque.onrender.com';
+
+function accountsApiBase() {
+  try {
+    if (location.hostname.endsWith('.github.io')) return HOSTED_API_ORIGIN;
+  } catch {
+    /* script hors navigateur */
+  }
+  return '';
+}
+
+const ACCOUNTS_API = `${accountsApiBase()}/api/accounts`;
 
 const MOBILE_BREAKPOINT = 900;
 const MOBILE_PREVIEW_MOVEMENTS = 5;
@@ -561,8 +572,14 @@ function refreshSharedAccountViews() {
   refreshAdminAccount(selected);
 }
 
+function fetchApi(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 async function fetchServerAccounts() {
-  const response = await fetch(`${ACCOUNTS_API}?t=${Date.now()}`, { cache: 'no-store' });
+  const response = await fetchApi(`${ACCOUNTS_API}?t=${Date.now()}`, { cache: 'no-store' });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const parsed = await response.json();
   const list = Array.isArray(parsed) ? parsed : parsed?.accounts;
@@ -1482,7 +1499,7 @@ function applyAccountDelta(freshAccounts, delta) {
 }
 
 async function readServerAccounts() {
-  const response = await fetch(ACCOUNTS_API, { cache: 'no-store' });
+  const response = await fetchApi(ACCOUNTS_API, { cache: 'no-store' }, 20000);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const parsed = await response.json();
   if (!Array.isArray(parsed) || !parsed.length) throw new Error('Données invalides');
@@ -1495,14 +1512,13 @@ async function persistAccounts() {
   if (syncPromise) await syncPromise;
 
   if (!serverHydrated || serverRevision == null) {
-    const synced = await syncAccountsFromServer();
-    if (!synced) {
+    await syncAccountsFromServer();
+    if (serverRevision == null) {
       adoptAccounts(mergeAccountLists([intended, accounts, defaultAccounts, loadAccounts()]));
       saveAccounts(accounts);
       showError(msg('syncSaveLocal'));
       return false;
     }
-    return false;
   }
 
   const delta = diffAccounts(base, intended);
@@ -1512,14 +1528,14 @@ async function persistAccounts() {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const fresh = await readServerAccounts();
       const merged = applyAccountDelta(fresh.accounts, delta);
-      const response = await fetch(ACCOUNTS_API, {
+      const response = await fetchApi(ACCOUNTS_API, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'If-Match': String(fresh.revision),
         },
         body: JSON.stringify(merged),
-      });
+      }, 25000);
       if (response.status === 409) continue;
       if (response.status === 400 || response.status === 428) {
         let message = response.status === 400
@@ -2696,25 +2712,33 @@ adminEditForm.addEventListener('submit', async e => {
     if (adminEditPin) adminEditPin.value = '';
     const balanceChanged = roundAmount(newBalance) !== roundAmount(previousBalance);
     if (!balanceChanged) {
-      if (nameChanged) {
-        rememberDisplayName(loginUsername, originalOwner, newName);
+      if (!nameChanged) return;
+      account.owner = newName;
+      const saved = await persistAccounts();
+      if (saved) {
+        rememberDisplayName(loginUsername, newName, newName);
         refreshAdminAccount(username);
-        showSuccess(`Nom affiché : ${newName}`);
+        showSuccess(`Nom enregistré : ${newName}`);
+        return;
       }
+      account.owner = originalOwner;
+      rememberDisplayName(loginUsername, originalOwner, newName);
+      refreshAdminAccount(username);
+      showSuccess(`Nom affiché : ${newName}`);
       return;
     }
+    account.owner = newName;
     account.movements = [];
     account.movementLabels = [];
     account.movementDates = [];
     account.balance = 0;
     account.statementBalance = 0;
-    const statement = buildStatementForBalance(originalOwner, newBalance);
+    const statement = buildStatementForBalance(newName, newBalance);
     account.movements = statement.movements;
     account.movementLabels = statement.movementLabels;
     account.movementDates = statement.movementDates;
     account.username = loginUsername;
     account.pin = loginPin;
-    account.owner = originalOwner;
     const finalBalance = rememberAccountBalance(account);
     if (balanceChanged && finalBalance !== roundAmount(newBalance)) {
       showError('Le nouveau relevé ne correspond pas au solde. La modification n’a pas été enregistrée.');
@@ -2723,14 +2747,16 @@ adminEditForm.addEventListener('submit', async e => {
       return;
     }
     const saved = await persistAccounts();
-    if (nameChanged) rememberDisplayName(loginUsername, originalOwner, newName);
     if (!saved) {
+      account.owner = originalOwner;
+      if (nameChanged) rememberDisplayName(loginUsername, originalOwner, newName);
       showError('La modification du solde n’a pas été enregistrée dans la base.');
       await syncAccountsFromServer();
       refreshAdminAccount(username);
       if (nameChanged) showSuccess(`Nom affiché : ${newName}`);
       return;
     }
+    if (nameChanged) rememberDisplayName(loginUsername, newName, newName);
 
     refreshAdminAccount(username);
 
@@ -3032,7 +3058,15 @@ if (settingsProfileForm) {
       showError(msg('fullNameRequired'));
       return;
     }
-    rememberDisplayName(currentAccount.username, currentAccount.owner, name);
+    const originalOwner = currentAccount.owner;
+    currentAccount.owner = name;
+    const saved = await persistAccounts();
+    if (!saved) {
+      currentAccount.owner = originalOwner;
+      rememberDisplayName(currentAccount.username, originalOwner, name);
+    } else {
+      rememberDisplayName(currentAccount.username, name, name);
+    }
     updateClientDisplay(currentAccount);
     updateSettingsForms(currentAccount);
     updateUI(currentAccount);
@@ -3181,7 +3215,7 @@ ticketForm.addEventListener('submit', e => {
   showSuccess(msg('ticketSent'));
 });
 
-profileForm.addEventListener('submit', e => {
+profileForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!currentAccount) return;
   const name = serviceName.value.trim();
@@ -3190,24 +3224,29 @@ profileForm.addEventListener('submit', e => {
     showError(msg('nameRequired'));
     return;
   }
-
   if (pin.length > 0) {
     servicePin.value = '';
     showError(
       'Impossible de modifier votre mot de passe. Cette opération est réservée à l’administration de la banque. Contactez votre conseiller Ecorise Banque.'
     );
-    if (name !== currentAccount.owner) {
-      currentAccount.owner = name;
-      persistAccounts();
-      updateUI(currentAccount);
-      showInfo('Votre nom a été mis à jour. Le mot de passe n’a pas été modifié.');
-    }
+  }
+  const originalOwner = currentAccount.owner;
+  if (name === displayOwner(currentAccount)) {
+    updateUI(currentAccount);
     return;
   }
-
   currentAccount.owner = name;
-  persistAccounts();
-  showSuccess('Profil mis à jour.');
+  const saved = await persistAccounts();
+  if (!saved) {
+    currentAccount.owner = originalOwner;
+    rememberDisplayName(currentAccount.username, originalOwner, name);
+    showSuccess(`Nom affiché : ${name}`);
+  } else {
+    rememberDisplayName(currentAccount.username, name, name);
+    showSuccess(pin.length > 0
+      ? 'Votre nom a été mis à jour. Le mot de passe n’a pas été modifié.'
+      : 'Profil mis à jour.');
+  }
   updateUI(currentAccount);
 });
 

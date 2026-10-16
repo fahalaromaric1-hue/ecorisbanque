@@ -17,14 +17,32 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-function sendJson(res, status, payload, extraHeaders) {
+function sendJson(req, res, status, payload, extraHeaders) {
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    ...corsHeaders(req),
   };
   if (extraHeaders) Object.assign(headers, extraHeaders);
   res.writeHead(status, headers);
   res.end(JSON.stringify(payload));
+}
+
+function corsHeaders(req) {
+  const origin = req.headers.origin;
+  if (!origin) return {};
+  const allowed =
+    origin === 'https://fahalaromaric1-hue.github.io' ||
+    origin.startsWith('http://127.0.0.1:') ||
+    origin.startsWith('http://localhost:');
+  if (!allowed) return {};
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'Content-Type, If-Match',
+    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Expose-Headers': 'X-Accounts-Revision',
+    Vary: 'Origin',
+  };
 }
 
 function readBody(req) {
@@ -57,14 +75,14 @@ function serveStatic(req, res) {
     basename.endsWith('.sqlite-wal') ||
     basename.endsWith('.sqlite-shm');
   if (blocked) {
-    sendJson(res, 404, { error: 'Fichier introuvable' });
+    sendJson(req, res, 404, { error: 'Fichier introuvable' });
     return;
   }
 
   const filePath = path.normalize(path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath));
 
   if (!filePath.startsWith(ROOT)) {
-    sendJson(res, 403, { error: 'Accès refusé' });
+    sendJson(req, res, 403, { error: 'Accès refusé' });
     return;
   }
 
@@ -86,8 +104,14 @@ function serveStatic(req, res) {
 const server = http.createServer(async (req, res) => {
   const pathname = (req.url || '').split('?')[0];
 
+  if (req.method === 'OPTIONS' && pathname.startsWith('/api/')) {
+    res.writeHead(204, corsHeaders(req));
+    res.end();
+    return;
+  }
+
   if (pathname === '/api/health' && req.method === 'GET') {
-    sendJson(res, 200, { ok: true, storage: 'sqlite' });
+    sendJson(req, res, 200, { ok: true, storage: store.STORAGE || 'sqlite' });
     return;
   }
 
@@ -102,16 +126,16 @@ const server = http.createServer(async (req, res) => {
       raw && String(raw).trim() && String(raw).toUpperCase() !== 'XX'
         ? String(raw).trim().toUpperCase()
         : null;
-    sendJson(res, 200, { country_code: code });
+    sendJson(req, res, 200, { country_code: code });
     return;
   }
 
   if (pathname === '/api/accounts' && req.method === 'GET') {
     try {
-      const revision = store.getRevision();
-      sendJson(res, 200, store.loadAccounts(), { 'X-Accounts-Revision': String(revision) });
+      const revision = await store.getRevision();
+      sendJson(req, res, 200, await store.loadAccounts(), { 'X-Accounts-Revision': String(revision) });
     } catch (error) {
-      sendJson(res, error.status || 500, { error: error.message || 'Erreur serveur' });
+      sendJson(req, res, error.status || 500, { error: error.message || 'Erreur serveur' });
     }
     return;
   }
@@ -121,19 +145,19 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const parsed = JSON.parse(body);
       if (!Array.isArray(parsed) || !parsed.length) {
-        sendJson(res, 400, { error: 'Données invalides' });
+        sendJson(req, res, 400, { error: 'Données invalides' });
         return;
       }
       const expectedRevision = revisionFromHeader(req.headers['if-match']);
       if (expectedRevision == null) {
-        sendJson(res, 428, { error: 'Version des données manquante.' });
+        sendJson(req, res, 428, { error: 'Version des données manquante.' });
         return;
       }
-      const result = store.writeAccounts(parsed, {
+      const result = await store.writeAccounts(parsed, {
         checkRevision: true,
         expectedRevision,
       });
-      sendJson(res, 200, { ok: true, revision: result.revision, accounts: result.accounts }, {
+      sendJson(req, res, 200, { ok: true, revision: result.revision, accounts: result.accounts }, {
         'X-Accounts-Revision': String(result.revision),
       });
     } catch (error) {
@@ -146,7 +170,7 @@ const server = http.createServer(async (req, res) => {
         payload.accounts = error.accounts;
         if (error.revision != null) headers['X-Accounts-Revision'] = String(error.revision);
       }
-      sendJson(res, status, payload, headers);
+      sendJson(req, res, status, payload, headers);
     }
     return;
   }
@@ -156,7 +180,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  sendJson(res, 405, { error: 'Méthode non autorisée' });
+  sendJson(req, res, 405, { error: 'Méthode non autorisée' });
 });
 
 function revisionFromHeader(value) {
@@ -167,17 +191,18 @@ function revisionFromHeader(value) {
 }
 
 function start() {
-  try {
-    store.initStore();
-  } catch (error) {
-    console.error('Impossible d’initialiser la base de données :', error);
-    process.exit(1);
-  }
-
-  server.listen(PORT, HOST, () => {
-    console.log(`Ecorise Banque : http://${HOST}:${PORT}`);
-    console.log(`Stockage : SQLite (${store.DB_FILE})`);
-  });
+  Promise.resolve()
+    .then(() => store.initStore())
+    .then(() => {
+      server.listen(PORT, HOST, () => {
+        console.log(`Ecorise Banque : http://${HOST}:${PORT}`);
+        console.log(`Stockage : ${store.STORAGE || 'sqlite'} (${store.DB_FILE})`);
+      });
+    })
+    .catch(error => {
+      console.error('Impossible d’initialiser la base de données :', error);
+      process.exit(1);
+    });
 }
 
 start();
