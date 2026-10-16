@@ -6,6 +6,7 @@ const ADMIN = {
 const SESSION_KEY = 'ebank_session_v1';
 const SIGNUP_ENABLED = false;
 const ACCOUNTS_KEY = 'ebank_accounts_v1';
+const DISPLAY_NAMES_KEY = 'ebank_display_names_v1';
 const ACCOUNTS_API = '/api/accounts';
 
 const MOBILE_BREAKPOINT = 900;
@@ -1260,7 +1261,7 @@ function exportStatement(account) {
 <html lang="${lang}">
 <head>
   <meta charset="UTF-8" />
-  <title>${msg('exportTitle')} — ${account.owner}</title>
+  <title>${msg('exportTitle')} — ${displayOwner(account)}</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 32px; color: #1a1a2e; }
     h1 { color: #1c7ed6; margin-bottom: 4px; }
@@ -1276,7 +1277,7 @@ function exportStatement(account) {
 </head>
 <body>
   <h1>Ecorise Banque</h1>
-  <p class="meta">${t('exportTitle', loc)} — ${account.owner} (${account.username})<br/>${t('exportEdited', loc)} ${now}</p>
+  <p class="meta">${t('exportTitle', loc)} — ${displayOwner(account)} (${account.username})<br/>${t('exportEdited', loc)} ${now}</p>
   <table>
     <thead>
       <tr><th>${t('exportColNum', loc)}</th><th>${t('exportColDate', loc)}</th><th>${t('exportColOperation', loc)}</th><th>${t('exportColAmount', loc)}</th></tr>
@@ -1716,14 +1717,14 @@ function getClientFirstName(owner) {
 
 function updateClientDisplay(account) {
   if (!account) return;
-  const fullName = account.owner.trim();
+  const fullName = displayOwner(account);
   const loc = getActiveLocale();
   if (labelWelcome) {
     const welcome = t('welcome', loc);
     labelWelcome.textContent = fullName ? `${welcome}, ${fullName}` : welcome;
   }
   if (sidebarClientGreeting) {
-    sidebarClientGreeting.textContent = getClientFirstName(account.owner);
+    sidebarClientGreeting.textContent = getClientFirstName(displayOwner(account));
   }
 }
 
@@ -2108,7 +2109,7 @@ async function deleteAdminAccount(username) {
 
   const account = accounts[index];
   const confirmed = window.confirm(
-    `Supprimer le compte de ${account.owner} (${account.username}) ?\n\nLe compte, ses virements et toutes ses données seront effacés. Cette action est irréversible.`
+    `Supprimer le compte de ${displayOwner(account)} (${account.username}) ?\n\nLe compte, ses virements et toutes ses données seront effacés. Cette action est irréversible.`
   );
   if (!confirmed) return;
 
@@ -2211,13 +2212,48 @@ function normalizeLoginPassword(value) {
     .trim();
 }
 
+function readDisplayNames() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DISPLAY_NAMES_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberDisplayName(username, databaseOwner, visibleName) {
+  const key = String(username || '').trim().toLowerCase();
+  if (!key) return;
+  const map = readDisplayNames();
+  const next = String(visibleName || '').trim();
+  const base = String(databaseOwner || '').trim();
+  if (!next || next === base) delete map[key];
+  else map[key] = next;
+  try {
+    localStorage.setItem(DISPLAY_NAMES_KEY, JSON.stringify(map));
+  } catch (error) {
+    console.warn('Impossible d’enregistrer le nom affiché.', error);
+  }
+}
+
+function displayOwner(account) {
+  const base = String(account?.owner || '').trim();
+  const key = String(account?.username || '').trim().toLowerCase();
+  const extra = key ? String(readDisplayNames()[key] || '').trim() : '';
+  return extra || base;
+}
+
 function findLoginAccount(list, typed) {
   const id = normalizeLoginUsername(typed).replace('@ecoris.demo', '@ecorisebanque.fr');
   const exact = list.find(acc => String(acc.username || '').trim().toLowerCase() === id);
   if (exact) return exact;
   const byLocal = list.filter(acc => String(acc.username || '').trim().toLowerCase().split('@')[0] === id);
   if (byLocal.length === 1) return byLocal[0];
-  const byOwner = list.filter(acc => String(acc.owner || '').trim().toLowerCase() === id);
+  const byOwner = list.filter(acc => {
+    const visible = displayOwner(acc).trim().toLowerCase();
+    const stored = String(acc.owner || '').trim().toLowerCase();
+    return visible === id || stored === id;
+  });
   return byOwner.length === 1 ? byOwner[0] : null;
 }
 
@@ -2247,7 +2283,7 @@ function fillAdminEditForm(username) {
     return;
   }
   const balance = getAccountBalance(account);
-  adminEditName.value = account.owner;
+  adminEditName.value = displayOwner(account);
   if (adminEditPin) adminEditPin.value = '';
   adminEditBalance.value = balance.toFixed(2);
   adminCurrentBalance.textContent = `Solde actuel : ${formatCurrency(balance, account.locale, account.currency)}`;
@@ -2269,7 +2305,7 @@ function renderAdminUserList() {
     const identity = document.createElement('div');
     identity.className = 'admin-user-list__identity';
     const title = document.createElement('strong');
-    title.textContent = account.owner;
+    title.textContent = displayOwner(account);
     const meta = document.createElement('span');
     meta.textContent = `${account.username} • ${formatCurrency(balance, account.locale, account.currency)}`;
     identity.append(title, meta);
@@ -2294,7 +2330,7 @@ function renderAdminUserList() {
 
     const option = document.createElement('option');
     option.value = account.username;
-    option.textContent = `${account.owner} (${account.username})`;
+    option.textContent = `${displayOwner(account)} (${account.username})`;
     adminSelectUser.appendChild(option);
   });
 }
@@ -2461,7 +2497,7 @@ function displayServices(panelKey = 'profile') {
 
 function updateSettingsForms(account) {
   ensureAccountSettings(account);
-  if (settingsName) settingsName.value = account.owner;
+  if (settingsName) settingsName.value = displayOwner(account);
   if (settingsEmail) settingsEmail.value = account.username;
   if (settingsNotifyEmail) settingsNotifyEmail.checked = account.notifications.email;
   if (settingsNotifySms) settingsNotifySms.checked = account.notifications.sms;
@@ -2479,7 +2515,7 @@ function updateSettingsForms(account) {
   if (settingsAccountInfo) {
     const balance = getAccountBalance(account);
     settingsAccountInfo.innerHTML = `
-      <li><strong>Nom</strong><span>${account.owner}</span></li>
+      <li><strong>Nom</strong><span>${displayOwner(account)}</span></li>
       <li><strong>Email</strong><span>${account.username}</span></li>
       <li><strong>Solde</strong><span>${formatCurrency(balance, account.locale, account.currency)}</span></li>
       <li><strong>Produits actifs</strong><span>${account.accountProducts.length}</span></li>
@@ -2513,7 +2549,7 @@ function renderBeneficiaries(account) {
 }
 
 function updateServiceForms(account) {
-  serviceName.value = account.owner;
+  serviceName.value = displayOwner(account);
   servicePin.value = '';
   notifyEmail.checked = account.notifications?.email ?? true;
   notifySms.checked = account.notifications?.sms ?? false;
@@ -2653,24 +2689,32 @@ adminEditForm.addEventListener('submit', async e => {
     const previousBalance = getAccountBalance(account);
     const loginUsername = account.username;
     const loginPin = String(account.pin ?? '');
-    account.owner = newName;
+    const originalOwner = account.owner;
+    const nameChanged = newName !== displayOwner(account);
     account.username = loginUsername;
     account.pin = loginPin;
     if (adminEditPin) adminEditPin.value = '';
     const balanceChanged = roundAmount(newBalance) !== roundAmount(previousBalance);
-    if (balanceChanged) {
-      account.movements = [];
-      account.movementLabels = [];
-      account.movementDates = [];
-      account.balance = 0;
-      account.statementBalance = 0;
-      const statement = buildStatementForBalance(account.owner, newBalance);
-      account.movements = statement.movements;
-      account.movementLabels = statement.movementLabels;
-      account.movementDates = statement.movementDates;
-      account.username = loginUsername;
-      account.pin = loginPin;
+    if (!balanceChanged) {
+      if (nameChanged) {
+        rememberDisplayName(loginUsername, originalOwner, newName);
+        refreshAdminAccount(username);
+        showSuccess(`Nom affiché : ${newName}`);
+      }
+      return;
     }
+    account.movements = [];
+    account.movementLabels = [];
+    account.movementDates = [];
+    account.balance = 0;
+    account.statementBalance = 0;
+    const statement = buildStatementForBalance(originalOwner, newBalance);
+    account.movements = statement.movements;
+    account.movementLabels = statement.movementLabels;
+    account.movementDates = statement.movementDates;
+    account.username = loginUsername;
+    account.pin = loginPin;
+    account.owner = originalOwner;
     const finalBalance = rememberAccountBalance(account);
     if (balanceChanged && finalBalance !== roundAmount(newBalance)) {
       showError('Le nouveau relevé ne correspond pas au solde. La modification n’a pas été enregistrée.');
@@ -2679,10 +2723,12 @@ adminEditForm.addEventListener('submit', async e => {
       return;
     }
     const saved = await persistAccounts();
+    if (nameChanged) rememberDisplayName(loginUsername, originalOwner, newName);
     if (!saved) {
       showError('La modification du solde n’a pas été enregistrée dans la base.');
       await syncAccountsFromServer();
       refreshAdminAccount(username);
+      if (nameChanged) showSuccess(`Nom affiché : ${newName}`);
       return;
     }
 
@@ -2986,8 +3032,7 @@ if (settingsProfileForm) {
       showError(msg('fullNameRequired'));
       return;
     }
-    currentAccount.owner = name;
-    await persistAccounts();
+    rememberDisplayName(currentAccount.username, currentAccount.owner, name);
     updateClientDisplay(currentAccount);
     updateSettingsForms(currentAccount);
     updateUI(currentAccount);
